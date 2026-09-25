@@ -1,4612 +1,3545 @@
 /* ============================================================
    RH — REAL HUMAN PRESENCE
-   Complete frontend application
-
-   Architecture:
-
-   GitHub Pages
-        ↓
-   Browser
-        ├── Camera
-        ├── Microphone
-        ├── MediaPipe segmentation
-        ├── Three.js environment
-        └── WebRTC
-                 ↕
-          Colab / ngrok
-                 ↕
-             Other user
-
-============================================================ */
+   APPLICATION ENGINE
+   ============================================================ */
 
 
 /* ============================================================
    CONFIGURATION
-============================================================ */
+   ============================================================ */
 
 const RH_CONFIG = {
 
-    signalingServer:
-        "https://runic-kamdyn-dispersedly.ngrok-free.dev",
+  /*
+   * IMPORTANT:
+   *
+   * Replace this URL after deploying the FastAPI backend.
+   *
+   * Example:
+   *
+   * wss://rh-signaling.onrender.com/ws
+   *
+   */
 
-    websocketServer:
-        "wss://runic-kamdyn-dispersedly.ngrok-free.dev/ws",
+  SIGNALING_URL:
+    "wss://REPLACE-WITH-YOUR-RENDER-SERVICE.onrender.com/ws",
 
-    defaultRoom:
-        "RH-DEMO",
 
-    iceServers: [
+  ROOM_DEFAULT:
+    "RH-DEMO",
 
-        {
-            urls:
-                "stun:stun.l.google.com:19302"
-        },
 
-        {
-            urls:
-                "stun:stun1.l.google.com:19302"
-        }
+  /*
+   * STUN helps WebRTC discover network paths.
+   *
+   * TURN should be added later for production reliability.
+   */
 
-    ]
+  ICE_SERVERS: [
+
+    {
+      urls:
+        "stun:stun.l.google.com:19302"
+    },
+
+    {
+      urls:
+        "stun:stun1.l.google.com:19302"
+    }
+
+  ],
+
+
+  DEV_DEBUG:
+    true
 
 };
 
 
 /* ============================================================
    APPLICATION STATE
-============================================================ */
+   ============================================================ */
 
 const state = {
 
-    selectedPlace:
-        "park",
+  roomId:
+    RH_CONFIG.ROOM_DEFAULT,
 
-    roomId:
-        RH_CONFIG.defaultRoom,
 
-    localStream:
-        null,
+  ws:
+    null,
 
-    remoteStream:
-        null,
+  wsReady:
+    false,
 
-    websocket:
-        null,
 
-    peerConnection:
-        null,
+  localStream:
+    null,
 
-    dataChannel:
-        null,
+  remoteStream:
+    null,
 
-    connectionId:
-        null,
 
-    remotePeerId:
-        null,
+  pc:
+    null,
 
-    isOfferer:
-        false,
 
-    connected:
-        false,
+  dataChannel:
+    null,
 
-    cameraEnabled:
-        true,
 
-    microphoneEnabled:
-        true,
+  connectionId:
+    null,
 
-    walking:
-        true,
+  peerId:
+    null,
 
-    localPosition: {
 
-        x: 50,
-        y: 55
+  peerPresent:
+    false,
 
-    },
 
-    remotePosition: {
+  /*
+   * The first participant becomes offerer.
+   *
+   * VERY IMPORTANT:
+   *
+   * state.offerer must be true BEFORE creating the
+   * RTCPeerConnection because that determines whether
+   * the presence DataChannel is created.
+   */
 
-        x: 60,
-        y: 55
+  offerer:
+    false,
 
-    },
 
-    targetLocalPosition: {
+  remoteDescriptionSet:
+    false,
 
-        x: 50,
-        y: 55
 
-    },
+  pendingIce:
+    [],
 
-    targetRemotePosition: {
 
-        x: 60,
-        y: 55
+  reconnectTimer:
+    null,
 
-    },
+  reconnectAttempt:
+    0,
 
-    lastPresenceSend:
-        0,
 
-    keys:
-        {},
+  /* ==========================================================
+     LOCAL / REMOTE POSITIONS
+     ========================================================== */
 
-    lastFrame:
-        0,
+  position: {
 
-    segmentation:
-        null,
+    x: 0,
 
-    segmentationReady:
-        false,
+    z: 0
 
-    remoteSegmentation:
-        null,
+  },
 
-    remoteSegmentationReady:
-        false,
 
-    audioContext:
-        null,
+  remotePosition: {
 
-    remotePanner:
-        null,
+    x: 2.2,
 
-    remoteGain:
-        null,
+    z: -1.2
 
-    three: {
+  },
 
-        scene:
-            null,
 
-        camera:
-            null,
+  keys:
+    new Set(),
 
-        renderer:
-            null,
 
-        localHuman:
-            null,
+  walking:
+    true,
 
-        remoteHuman:
-            null,
 
-        localTexture:
-            null,
+  muted:
+    false,
 
-        remoteTexture:
-            null,
 
-        localShadow:
-            null,
+  cameraOn:
+    true,
 
-        remoteShadow:
-            null,
 
-        clock:
-            null
+  running:
+    false,
 
-    }
+
+  /* ==========================================================
+     SEGMENTATION
+     ========================================================== */
+
+  segmentationReady:
+    false,
+
+  segmentation:
+    null,
+
+  segmentBusy:
+    false,
+
+
+  /* ==========================================================
+     THREE.JS
+     ========================================================== */
+
+  scene:
+    null,
+
+  camera:
+    null,
+
+  renderer:
+    null,
+
+  clock:
+    null,
+
+
+  humanLocal:
+    null,
+
+  humanRemote:
+    null,
+
+
+  humanLocalTexture:
+    null,
+
+  humanRemoteTexture:
+    null,
+
+
+  /* ==========================================================
+     AUDIO
+     ========================================================== */
+
+  audioContext:
+    null,
+
+  audioPanner:
+    null,
+
+
+  animation:
+    0
 
 };
 
 
 /* ============================================================
-   DOM
-============================================================ */
+   DOM HELPERS
+   ============================================================ */
 
-const dom = {
+const $ = id =>
+  document.getElementById(id);
 
-    welcome:
-        document.getElementById("rhWelcome"),
 
-    setup:
-        document.getElementById("rhSetup"),
+const lobby =
+  $("lobby");
 
-    world:
-        document.getElementById("rhWorld"),
 
-    enterRhBtn:
-        document.getElementById("enterRhBtn"),
+const world =
+  $("world");
 
-    startRhBtn:
-        document.getElementById("startRhBtn"),
 
-    roomInput:
-        document.getElementById("roomInput"),
+const roomInput =
+  $("roomInput");
 
-    placeCards:
-        document.querySelectorAll(".place-card"),
 
-    localVideo:
-        document.getElementById("localVideo"),
+const roomLabel =
+  $("roomLabel");
 
-    remoteVideo:
-        document.getElementById("remoteVideo"),
 
-    localCanvas:
-        document.getElementById("localCanvas"),
+const connectionState =
+  $("connectionState");
 
-    remoteCanvas:
-        document.getElementById("remoteCanvas"),
 
-    localPresence:
-        document.getElementById("localPresence"),
+const presenceTitle =
+  $("presenceTitle");
 
-    remotePresence:
-        document.getElementById("remotePresence"),
 
-    placeName:
-        document.getElementById("placeName"),
+const presenceText =
+  $("presenceText");
 
-    worldRoom:
-        document.getElementById("worldRoom"),
 
-    waitingMessage:
-        document.getElementById("waitingMessage"),
+const participantCount =
+  $("participantCount");
 
-    connectionDot:
-        document.getElementById("connectionDot"),
 
-    connectionText:
-        document.getElementById("connectionText"),
-
-    muteBtn:
-        document.getElementById("muteBtn"),
-
-    cameraBtn:
-        document.getElementById("cameraBtn"),
-
-    walkBtn:
-        document.getElementById("walkBtn"),
-
-    meetBtn:
-        document.getElementById("meetBtn"),
-
-    copyWorldRoomBtn:
-        document.getElementById("copyWorldRoomBtn"),
-
-    exitBtn:
-        document.getElementById("exitBtn"),
-
-    movementHint:
-        document.getElementById("movementHint"),
-
-    debugHttps:
-        document.getElementById("debugHttps"),
-
-    debugCamera:
-        document.getElementById("debugCamera"),
-
-    debugSignal:
-        document.getElementById("debugSignal"),
-
-    debugWebrtc:
-        document.getElementById("debugWebrtc"),
-
-    toast:
-        document.getElementById("rhToast"),
-
-    toastText:
-        document.getElementById("toastText"),
-
-    rhCanvas:
-        document.getElementById("rhCanvas")
-
-};
-
-
-/* ============================================================
-   INITIALIZATION
-============================================================ */
-
-document.addEventListener(
-    "DOMContentLoaded",
-    initializeRH
-);
-
-
-function initializeRH() {
-
-    setupUI();
-
-    updateHttpsDebug();
-
-    updateConnectionStatus(
-        "waiting",
-        "Ready"
-    );
-
-    console.log(
-        "[RH] Real Human Presence initialized."
-    );
-}
-
-
-/* ============================================================
-   UI SETUP
-============================================================ */
-
-function setupUI() {
-
-
-    /* --------------------------------------------------------
-       Enter RH
-    -------------------------------------------------------- */
-
-    dom.enterRhBtn.addEventListener(
-        "click",
-        async () => {
-
-            showScreen(
-                "setup"
-            );
-
-            await initializeAudio();
-
-        }
-    );
-
-
-    /* --------------------------------------------------------
-       Place selection
-    -------------------------------------------------------- */
-
-    dom.placeCards.forEach(
-        card => {
-
-            card.addEventListener(
-                "click",
-                () => {
-
-                    dom.placeCards.forEach(
-                        item => {
-
-                            item.classList.remove(
-                                "active"
-                            );
-
-                        }
-                    );
-
-                    card.classList.add(
-                        "active"
-                    );
-
-                    state.selectedPlace =
-                        card.dataset.place;
-
-                }
-            );
-
-        }
-    );
-
-
-    /* --------------------------------------------------------
-       Start RH
-    -------------------------------------------------------- */
-
-    dom.startRhBtn.addEventListener(
-        "click",
-        startRH
-    );
-
-
-    /* --------------------------------------------------------
-       Controls
-    -------------------------------------------------------- */
-
-    dom.muteBtn.addEventListener(
-        "click",
-        toggleMicrophone
-    );
-
-
-    dom.cameraBtn.addEventListener(
-        "click",
-        toggleCamera
-    );
-
-
-    dom.walkBtn.addEventListener(
-        "click",
-        toggleWalking
-    );
-
-
-    dom.meetBtn.addEventListener(
-        "click",
-        moveCloserToPerson
-    );
-
-
-    dom.copyWorldRoomBtn.addEventListener(
-        "click",
-        copyRoom
-    );
-
-
-    dom.exitBtn.addEventListener(
-        "click",
-        exitRH
-    );
-
-
-    /* --------------------------------------------------------
-       Keyboard
-    -------------------------------------------------------- */
-
-    window.addEventListener(
-        "keydown",
-        handleKeyDown
-    );
-
-
-    window.addEventListener(
-        "keyup",
-        handleKeyUp
-    );
-
-
-    /* --------------------------------------------------------
-       Click-to-walk
-    -------------------------------------------------------- */
-
-    dom.rhCanvas.addEventListener(
-        "click",
-        handleWorldClick
-    );
-
-
-    /* --------------------------------------------------------
-       Resize
-    -------------------------------------------------------- */
-
-    window.addEventListener(
-        "resize",
-        handleResize
-    );
-
-}
-
-
-/* ============================================================
-   SCREEN MANAGEMENT
-============================================================ */
-
-function showScreen(screen) {
-
-    dom.welcome.classList.add(
-        "hidden"
-    );
-
-    dom.setup.classList.add(
-        "hidden"
-    );
-
-    dom.world.classList.add(
-        "hidden"
-    );
-
-
-    if (screen === "welcome") {
-
-        dom.welcome.classList.remove(
-            "hidden"
-        );
-
-    }
-
-
-    if (screen === "setup") {
-
-        dom.setup.classList.remove(
-            "hidden"
-        );
-
-    }
-
-
-    if (screen === "world") {
-
-        dom.world.classList.remove(
-            "hidden"
-        );
-
-    }
-
-}
-
-
-/* ============================================================
-   START RH
-============================================================ */
-
-async function startRH() {
-
-    state.roomId =
-        sanitizeRoom(
-            dom.roomInput.value
-        );
-
-
-    if (!state.roomId) {
-
-        showToast(
-            "Please enter an RH room name."
-        );
-
-        return;
-
-    }
-
-
-    dom.roomInput.value =
-        state.roomId;
-
-
-    dom.worldRoom.textContent =
-        state.roomId;
-
-
-    prepareWorld();
-
-
-    showScreen(
-        "world"
-    );
-
-
-    updateConnectionStatus(
-        "waiting",
-        "Starting"
-    );
-
-
-    try {
-
-        await startCamera();
-
-        await initializeSegmentation();
-
-        connectSignaling();
-
-    }
-
-    catch (error) {
-
-        console.error(
-            "[RH] Startup error:",
-            error
-        );
-
-        showToast(
-            "Camera setup could not start."
-        );
-
-        enterOfflineDemoMode();
-
-    }
-
-}
-
-
-/* ============================================================
-   ROOM SANITIZATION
-============================================================ */
-
-function sanitizeRoom(value) {
-
-    return String(value || "")
-        .trim()
-        .toUpperCase()
-        .replace(
-            /[^A-Z0-9-_]/g,
-            ""
-        )
-        .slice(
-            0,
-            32
-        );
-
-}
-
-
-/* ============================================================
-   CAMERA + MICROPHONE
-============================================================ */
-
-async function startCamera() {
-
-    updateDebug(
-        dom.debugCamera,
-        "Requesting"
-    );
-
-
-    if (
-        !window.isSecureContext &&
-        location.hostname !== "localhost"
-    ) {
-
-        updateDebug(
-            dom.debugCamera,
-            "HTTPS required"
-        );
-
-        showToast(
-            "RH needs HTTPS for camera access."
-        );
-
-        throw new Error(
-            "Secure context required."
-        );
-
-    }
-
-
-    if (
-        !navigator.mediaDevices ||
-        !navigator.mediaDevices.getUserMedia
-    ) {
-
-        updateDebug(
-            dom.debugCamera,
-            "Unavailable"
-        );
-
-        throw new Error(
-            "getUserMedia unavailable."
-        );
-
-    }
-
-
-    try {
-
-        const stream =
-            await navigator.mediaDevices.getUserMedia({
-
-                video: {
-
-                    width: {
-                        ideal: 1280
-                    },
-
-                    height: {
-                        ideal: 720
-                    },
-
-                    facingMode:
-                        "user"
-
-                },
-
-                audio: {
-
-                    echoCancellation:
-                        true,
-
-                    noiseSuppression:
-                        true,
-
-                    autoGainControl:
-                        true
-
-                }
-
-            });
-
-
-        state.localStream =
-            stream;
-
-
-        dom.localVideo.srcObject =
-            stream;
-
-
-        await dom.localVideo.play();
-
-
-        state.cameraEnabled =
-            true;
-
-        state.microphoneEnabled =
-            true;
-
-
-        updateDebug(
-            dom.debugCamera,
-            "OK"
-        );
-
-
-        updateControls();
-
-
-        console.log(
-            "[RH] Camera and microphone ready."
-        );
-
-    }
-
-    catch (error) {
-
-        console.error(
-            "[RH] getUserMedia error:",
-            error
-        );
-
-
-        updateDebug(
-            dom.debugCamera,
-            error.name || "Denied"
-        );
-
-
-        if (
-            error.name ===
-            "NotAllowedError"
-        ) {
-
-            showToast(
-                "Camera/microphone permission was denied."
-            );
-
-        }
-
-        else if (
-            error.name ===
-            "NotFoundError"
-        ) {
-
-            showToast(
-                "No camera or microphone was found."
-            );
-
-        }
-
-        else {
-
-            showToast(
-                "Unable to access your camera."
-            );
-
-        }
-
-
-        throw error;
-
-    }
-
-}
-
-
-/* ============================================================
-   MEDIAPIPE SELFIE SEGMENTATION
-============================================================ */
-
-async function initializeSegmentation() {
-
-    if (
-        typeof SelfieSegmentation ===
-        "undefined"
-    ) {
-
-        console.warn(
-            "[RH] MediaPipe SelfieSegmentation unavailable."
-        );
-
-        showToast(
-            "Human cutout engine unavailable. Live video will still work."
-        );
-
-        return;
-
-    }
-
-
-    try {
-
-        state.segmentation =
-            new SelfieSegmentation({
-
-                locateFile:
-                    file => {
-
-                        return (
-                            "https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/" +
-                            file
-                        );
-
-                    }
-
-            });
-
-
-        state.segmentation.setOptions({
-
-            modelSelection:
-                1
-
-        });
-
-
-        state.segmentation.onResults(
-            handleLocalSegmentationResults
-        );
-
-
-        state.segmentationReady =
-            true;
-
-
-        console.log(
-            "[RH] Local segmentation ready."
-        );
-
-    }
-
-    catch (error) {
-
-        console.warn(
-            "[RH] Segmentation initialization failed:",
-            error
-        );
-
-    }
-
-}
-
-
-/* ============================================================
-   LOCAL SEGMENTATION RESULTS
-============================================================ */
-
-function handleLocalSegmentationResults(
-    results
-) {
-
-    renderTransparentPerson(
-        dom.localCanvas,
-        results.image,
-        results.segmentationMask,
-        true
-    );
-
-}
-
-
-/* ============================================================
-   PROCESS LOCAL CAMERA FRAME
-============================================================ */
-
-async function processLocalSegmentation() {
-
-    if (
-        !state.segmentationReady ||
-        !state.segmentation
-    ) {
-
-        drawFallbackVideo(
-            dom.localCanvas,
-            dom.localVideo
-        );
-
-        return;
-
-    }
-
-
-    if (
-        dom.localVideo.readyState <
-        HTMLMediaElement.HAVE_CURRENT_DATA
-    ) {
-
-        return;
-
-    }
-
-
-    try {
-
-        await state.segmentation.send({
-
-            image:
-                dom.localVideo
-
-        });
-
-    }
-
-    catch (error) {
-
-        console.warn(
-            "[RH] Segmentation frame error:",
-            error
-        );
-
-    }
-
-}
-
-
-/* ============================================================
-   TRANSPARENT HUMAN RENDERING
-============================================================ */
-
-function renderTransparentPerson(
-    canvas,
-    image,
-    mask,
-    mirror
-) {
-
-    if (
-        !canvas ||
-        !image ||
-        !mask
-    ) {
-
-        return;
-
-    }
-
-
-    const width =
-        canvas.width =
-        640;
-
-    const height =
-        canvas.height =
-        480;
-
-
-    const ctx =
-        canvas.getContext(
-            "2d"
-        );
-
-
-    ctx.clearRect(
-        0,
-        0,
-        width,
-        height
-    );
-
-
-    ctx.save();
-
-
-    if (mirror) {
-
-        ctx.translate(
-            width,
-            0
-        );
-
-        ctx.scale(
-            -1,
-            1
-        );
-
-    }
-
-
-    ctx.drawImage(
-        image,
-        0,
-        0,
-        width,
-        height
-    );
-
-
-    ctx.restore();
-
-
-    /* --------------------------------------------------------
-       Apply mask.
-
-       We need the mask aligned with the same image transform.
-    -------------------------------------------------------- */
-
-    const maskCanvas =
-        document.createElement(
-            "canvas"
-        );
-
-
-    maskCanvas.width =
-        width;
-
-    maskCanvas.height =
-        height;
-
-
-    const maskCtx =
-        maskCanvas.getContext(
-            "2d"
-        );
-
-
-    maskCtx.save();
-
-
-    if (mirror) {
-
-        maskCtx.translate(
-            width,
-            0
-        );
-
-        maskCtx.scale(
-            -1,
-            1
-        );
-
-    }
-
-
-    maskCtx.drawImage(
-        mask,
-        0,
-        0,
-        width,
-        height
-    );
-
-
-    maskCtx.restore();
-
-
-    const personPixels =
-        ctx.getImageData(
-            0,
-            0,
-            width,
-            height
-        );
-
-
-    const maskPixels =
-        maskCtx.getImageData(
-            0,
-            0,
-            width,
-            height
-        );
-
-
-    for (
-        let i = 0;
-        i < personPixels.data.length;
-        i += 4
-    ) {
-
-        const maskValue =
-            maskPixels.data[i];
-
-
-        if (
-            maskValue < 100
-        ) {
-
-            personPixels.data[i + 3] =
-                0;
-
-        }
-
-        else {
-
-            const alpha =
-                Math.min(
-                    255,
-                    Math.max(
-                        0,
-                        (maskValue - 60) * 1.5
-                    )
-                );
-
-
-            personPixels.data[i + 3] =
-                alpha;
-
-        }
-
-    }
-
-
-    ctx.putImageData(
-        personPixels,
-        0,
-        0
-    );
-
-}
-
-
-/* ============================================================
-   FALLBACK VIDEO
-============================================================ */
-
-function drawFallbackVideo(
-    canvas,
-    video
-) {
-
-    if (
-        !video ||
-        video.readyState <
-        HTMLMediaElement.HAVE_CURRENT_DATA
-    ) {
-
-        return;
-
-    }
-
-
-    canvas.width =
-        640;
-
-    canvas.height =
-        480;
-
-
-    const ctx =
-        canvas.getContext(
-            "2d"
-        );
-
-
-    ctx.save();
-
-
-    ctx.translate(
-        canvas.width,
-        0
-    );
-
-
-    ctx.scale(
-        -1,
-        1
-    );
-
-
-    ctx.drawImage(
-        video,
-        0,
-        0,
-        canvas.width,
-        canvas.height
-    );
-
-
-    ctx.restore();
-
-}
-
-
-/* ============================================================
-   THREE.JS WORLD
-============================================================ */
-
-function prepareWorld() {
-
-    if (
-        state.three.scene
-    ) {
-
-        return;
-
-    }
-
-
-    if (
-        typeof THREE ===
-        "undefined"
-    ) {
-
-        console.error(
-            "[RH] Three.js unavailable."
-        );
-
-        return;
-
-    }
-
-
-    const scene =
-        new THREE.Scene();
-
-
-    scene.fog =
-        new THREE.Fog(
-            0x9fc7bd,
-            35,
-            90
-        );
-
-
-    const camera =
-        new THREE.PerspectiveCamera(
-            52,
-            window.innerWidth /
-            window.innerHeight,
-            0.1,
-            200
-        );
-
-
-    camera.position.set(
-        0,
-        8,
-        18
-    );
-
-
-    camera.lookAt(
-        0,
-        1.5,
-        0
-    );
-
-
-    const renderer =
-        new THREE.WebGLRenderer({
-
-            canvas:
-                dom.rhCanvas,
-
-            antialias:
-                true,
-
-            alpha:
-                false
-
-        });
-
-
-    renderer.setPixelRatio(
-        Math.min(
-            window.devicePixelRatio,
-            2
-        )
-    );
-
-
-    renderer.setSize(
-        window.innerWidth,
-        window.innerHeight
-    );
-
-
-    renderer.shadowMap.enabled =
-        true;
-
-
-    renderer.shadowMap.type =
-        THREE.PCFSoftShadowMap;
-
-
-    const clock =
-        new THREE.Clock();
-
-
-    state.three.scene =
-        scene;
-
-    state.three.camera =
-        camera;
-
-    state.three.renderer =
-        renderer;
-
-    state.three.clock =
-        clock;
-
-
-    buildEnvironment();
-
-
-    createHumanMeshes();
-
-
-    animateWorld();
-
-}
-
-
-/* ============================================================
-   BUILD ENVIRONMENT
-============================================================ */
-
-function buildEnvironment() {
-
-    const scene =
-        state.three.scene;
-
-
-    /* --------------------------------------------------------
-       Sky
-    -------------------------------------------------------- */
-
-    scene.background =
-        new THREE.Color(
-            0x9fc9c0
-        );
-
-
-    /* --------------------------------------------------------
-       Ambient light
-    -------------------------------------------------------- */
-
-    const ambient =
-        new THREE.HemisphereLight(
-            0xe9ffff,
-            0x48605a,
-            2.2
-        );
-
-
-    scene.add(
-        ambient
-    );
-
-
-    /* --------------------------------------------------------
-       Sun
-    -------------------------------------------------------- */
-
-    const sun =
-        new THREE.DirectionalLight(
-            0xfff4d5,
-            3.5
-        );
-
-
-    sun.position.set(
-        -15,
-        25,
-        10
-    );
-
-
-    sun.castShadow =
-        true;
-
-
-    sun.shadow.mapSize.width =
-        2048;
-
-    sun.shadow.mapSize.height =
-        2048;
-
-
-    scene.add(
-        sun
-    );
-
-
-    /* --------------------------------------------------------
-       Ground
-    -------------------------------------------------------- */
-
-    const groundGeometry =
-        new THREE.PlaneGeometry(
-            120,
-            120
-        );
-
-
-    const groundMaterial =
-        new THREE.MeshStandardMaterial({
-
-            color:
-                0x5e8c70,
-
-            roughness:
-                1
-
-        });
-
-
-    const ground =
-        new THREE.Mesh(
-            groundGeometry,
-            groundMaterial
-        );
-
-
-    ground.rotation.x =
-        -Math.PI / 2;
-
-
-    ground.receiveShadow =
-        true;
-
-
-    scene.add(
-        ground
-    );
-
-
-    /* --------------------------------------------------------
-       Walking path
-    -------------------------------------------------------- */
-
-    const pathGeometry =
-        new THREE.PlaneGeometry(
-            7,
-            100
-        );
-
-
-    const pathMaterial =
-        new THREE.MeshStandardMaterial({
-
-            color:
-                0xc7b997,
-
-            roughness:
-                1
-
-        });
-
-
-    const path =
-        new THREE.Mesh(
-            pathGeometry,
-            pathMaterial
-        );
-
-
-    path.rotation.x =
-        -Math.PI / 2;
-
-
-    path.position.y =
-        0.012;
-
-
-    path.receiveShadow =
-        true;
-
-
-    scene.add(
-        path
-    );
-
-
-    /* --------------------------------------------------------
-       Water
-    -------------------------------------------------------- */
-
-    const waterGeometry =
-        new THREE.PlaneGeometry(
-            25,
-            35
-        );
-
-
-    const waterMaterial =
-        new THREE.MeshStandardMaterial({
-
-            color:
-                0x4e9eae,
-
-            roughness:
-                0.25,
-
-            metalness:
-                0.1,
-
-            transparent:
-                true,
-
-            opacity:
-                0.85
-
-        });
-
-
-    const water =
-        new THREE.Mesh(
-            waterGeometry,
-            waterMaterial
-        );
-
-
-    water.rotation.x =
-        -Math.PI / 2;
-
-
-    water.position.set(
-        -22,
-        0.02,
-        -5
-    );
-
-
-    scene.add(
-        water
-    );
-
-
-    /* --------------------------------------------------------
-       Trees
-    -------------------------------------------------------- */
-
-    for (
-        let i = 0;
-        i < 28;
-        i++
-    ) {
-
-        createTree(
-            randomTreeX(),
-            randomTreeZ()
-        );
-
-    }
-
-
-    /* --------------------------------------------------------
-       Sun sphere
-    -------------------------------------------------------- */
-
-    const sunGeometry =
-        new THREE.SphereGeometry(
-            2.2,
-            32,
-            32
-        );
-
-
-    const sunMaterial =
-        new THREE.MeshBasicMaterial({
-
-            color:
-                0xffe6a3
-
-        });
-
-
-    const sunSphere =
-        new THREE.Mesh(
-            sunGeometry,
-            sunMaterial
-        );
-
-
-    sunSphere.position.set(
-        -28,
-        24,
-        -35
-    );
-
-
-    scene.add(
-        sunSphere
-    );
-
-}
-
-
-/* ============================================================
-   TREE
-============================================================ */
-
-function createTree(
-    x,
-    z
-) {
-
-    const scene =
-        state.three.scene;
-
-
-    const trunkGeometry =
-        new THREE.CylinderGeometry(
-            0.22,
-            0.38,
-            3,
-            10
-        );
-
-
-    const trunkMaterial =
-        new THREE.MeshStandardMaterial({
-
-            color:
-                0x5c3926
-
-        });
-
-
-    const trunk =
-        new THREE.Mesh(
-            trunkGeometry,
-            trunkMaterial
-        );
-
-
-    trunk.position.set(
-        x,
-        1.5,
-        z
-    );
-
-
-    trunk.castShadow =
-        true;
-
-
-    scene.add(
-        trunk
-    );
-
-
-    const foliageGeometry =
-        new THREE.SphereGeometry(
-            1.7,
-            16,
-            12
-        );
-
-
-    const foliageMaterial =
-        new THREE.MeshStandardMaterial({
-
-            color:
-                0x397a58,
-
-            roughness:
-                1
-
-        });
-
-
-    const foliage =
-        new THREE.Mesh(
-            foliageGeometry,
-            foliageMaterial
-        );
-
-
-    foliage.position.set(
-        x,
-        4,
-        z
-    );
-
-
-    foliage.scale.set(
-        1,
-        1.15,
-        1
-    );
-
-
-    foliage.castShadow =
-        true;
-
-
-    scene.add(
-        foliage
-    );
-
-}
-
-
-/* ============================================================
-   TREE POSITION HELPERS
-============================================================ */
-
-function randomTreeX() {
-
-    let x;
-
-    do {
-
-        x =
-            (Math.random() - 0.5) *
-            65;
-
-    }
-
-    while (
-        Math.abs(x) < 6
-    );
-
-
-    return x;
-
-}
-
-
-function randomTreeZ() {
-
-    return (
-        Math.random() - 0.5
-    ) * 80;
-
-}
-
-
-/* ============================================================
-   HUMAN MESHES
-============================================================ */
-
-function createHumanMeshes() {
-
-    const scene =
-        state.three.scene;
-
-
-    const localTexture =
-        new THREE.CanvasTexture(
-            dom.localCanvas
-        );
-
-
-    localTexture.colorSpace =
-        THREE.SRGBColorSpace;
-
-
-    localTexture.minFilter =
-        THREE.LinearFilter;
-
-
-    const remoteTexture =
-        new THREE.CanvasTexture(
-            dom.remoteCanvas
-        );
-
-
-    remoteTexture.colorSpace =
-        THREE.SRGBColorSpace;
-
-
-    remoteTexture.minFilter =
-        THREE.LinearFilter;
-
-
-    state.three.localTexture =
-        localTexture;
-
-
-    state.three.remoteTexture =
-        remoteTexture;
-
-
-    const geometry =
-        new THREE.PlaneGeometry(
-            4.2,
-            4.2
-        );
-
-
-    const localMaterial =
-        new THREE.MeshBasicMaterial({
-
-            map:
-                localTexture,
-
-            transparent:
-                true,
-
-            depthWrite:
-                false,
-
-            side:
-                THREE.DoubleSide
-
-        });
-
-
-    const remoteMaterial =
-        new THREE.MeshBasicMaterial({
-
-            map:
-                remoteTexture,
-
-            transparent:
-                true,
-
-            depthWrite:
-                false,
-
-            side:
-                THREE.DoubleSide
-
-        });
-
-
-    const localHuman =
-        new THREE.Mesh(
-            geometry,
-            localMaterial
-        );
-
-
-    const remoteHuman =
-        new THREE.Mesh(
-            geometry.clone(),
-            remoteMaterial
-        );
-
-
-    localHuman.position.set(
-        -1,
-        2.2,
-        4
-    );
-
-
-    remoteHuman.position.set(
-        2,
-        2.2,
-        4
-    );
-
-
-    scene.add(
-        localHuman
-    );
-
-
-    scene.add(
-        remoteHuman
-    );
-
-
-    state.three.localHuman =
-        localHuman;
-
-
-    state.three.remoteHuman =
-        remoteHuman;
-
-
-    /* --------------------------------------------------------
-       Ground shadows
-    -------------------------------------------------------- */
-
-    const shadowGeometry =
-        new THREE.CircleGeometry(
-            1.1,
-            32
-        );
-
-
-    const shadowMaterial =
-        new THREE.MeshBasicMaterial({
-
-            color:
-                0x17241d,
-
-            transparent:
-                true,
-
-            opacity:
-                0.3,
-
-            depthWrite:
-                false
-
-        });
-
-
-    const localShadow =
-        new THREE.Mesh(
-            shadowGeometry,
-            shadowMaterial.clone()
-        );
-
-
-    const remoteShadow =
-        new THREE.Mesh(
-            shadowGeometry,
-            shadowMaterial.clone()
-        );
-
-
-    localShadow.rotation.x =
-        -Math.PI / 2;
-
-
-    remoteShadow.rotation.x =
-        -Math.PI / 2;
-
-
-    localShadow.position.y =
-        0.03;
-
-
-    remoteShadow.position.y =
-        0.03;
-
-
-    scene.add(
-        localShadow
-    );
-
-
-    scene.add(
-        remoteShadow
-    );
-
-
-    state.three.localShadow =
-        localShadow;
-
-
-    state.three.remoteShadow =
-        remoteShadow;
-
-
-    /* --------------------------------------------------------
-       Hide 3D human until camera starts.
-    -------------------------------------------------------- */
-
-    localHuman.visible =
-        false;
-
-
-    remoteHuman.visible =
-        false;
-
-}
-
-
-/* ============================================================
-   WORLD ANIMATION
-============================================================ */
-
-function animateWorld(
-    timestamp = 0
-) {
-
-    requestAnimationFrame(
-        animateWorld
-    );
-
-
-    if (
-        !state.three.renderer ||
-        !state.three.scene ||
-        !state.three.camera
-    ) {
-
-        return;
-
-    }
-
-
-    const delta =
-        Math.min(
-            0.05,
-            state.three.clock.getDelta()
-        );
-
-
-    updateMovement(
-        delta
-    );
-
-
-    updateHumanMeshes();
-
-
-    updateSpatialAudio();
-
-
-    processLocalSegmentation();
-
-
-    if (
-        state.three.localTexture
-    ) {
-
-        state.three.localTexture.needsUpdate =
-            true;
-
-    }
-
-
-    if (
-        state.three.remoteTexture
-    ) {
-
-        state.three.remoteTexture.needsUpdate =
-            true;
-
-    }
-
-
-    sendPresenceIfNeeded(
-        timestamp
-    );
-
-
-    state.three.renderer.render(
-        state.three.scene,
-        state.three.camera
-    );
-
-}
-
-
-/* ============================================================
-   UPDATE HUMAN MESHES
-============================================================ */
-
-function updateHumanMeshes() {
-
-    const local =
-        state.three.localHuman;
-
-    const remote =
-        state.three.remoteHuman;
-
-
-    if (local) {
-
-        const position =
-            screenToWorld(
-                state.localPosition
-            );
-
-
-        local.position.lerp(
-            position,
-            0.1
-        );
-
-
-        local.visible =
-            state.cameraEnabled;
-
-
-        local.quaternion.copy(
-            state.three.camera.quaternion
-        );
-
-
-        const depthScale =
-            0.8 +
-            (
-                1 -
-                state.localPosition.y / 100
-            ) * 0.45;
-
-
-        local.scale.set(
-            depthScale,
-            depthScale,
-            depthScale
-        );
-
-    }
-
-
-    if (remote) {
-
-        const position =
-            screenToWorld(
-                state.remotePosition
-            );
-
-
-        remote.position.lerp(
-            position,
-            0.1
-        );
-
-
-        remote.visible =
-            !!state.remoteStream;
-
-
-        remote.quaternion.copy(
-            state.three.camera.quaternion
-        );
-
-
-        const depthScale =
-            0.8 +
-            (
-                1 -
-                state.remotePosition.y / 100
-            ) * 0.45;
-
-
-        remote.scale.set(
-            depthScale,
-            depthScale,
-            depthScale
-        );
-
-    }
-
-
-    updateShadow(
-        state.three.localShadow,
-        state.three.localHuman
-    );
-
-
-    updateShadow(
-        state.three.remoteShadow,
-        state.three.remoteHuman
-    );
-
-}
-
-
-/* ============================================================
-   SCREEN POSITION → WORLD POSITION
-============================================================ */
-
-function screenToWorld(
-    position
-) {
-
-    const x =
-        (
-            position.x -
-            50
-        ) / 8;
-
-
-    const z =
-        (
-            position.y -
-            50
-        ) / 5;
-
-
-    return new THREE.Vector3(
-        x,
-        2.2,
-        z
-    );
-
-}
-
-
-/* ============================================================
-   SHADOW
-============================================================ */
-
-function updateShadow(
-    shadow,
-    human
-) {
-
-    if (
-        !shadow ||
-        !human
-    ) {
-
-        return;
-
-    }
-
-
-    shadow.position.x =
-        human.position.x;
-
-
-    shadow.position.z =
-        human.position.z;
-
-
-    shadow.scale.set(
-        human.scale.x,
-        human.scale.x,
-        human.scale.x
-    );
-
-
-    shadow.visible =
-        human.visible;
-
-}
-
-
-/* ============================================================
-   MOVEMENT
-============================================================ */
-
-function updateMovement(
-    delta
-) {
-
-    if (
-        !state.walking
-    ) {
-
-        return;
-
-    }
-
-
-    const speed =
-        12 * delta;
-
-
-    let dx = 0;
-    let dy = 0;
-
-
-    if (
-        state.keys["w"] ||
-        state.keys["ArrowUp"]
-    ) {
-
-        dy -= speed;
-
-    }
-
-
-    if (
-        state.keys["s"] ||
-        state.keys["ArrowDown"]
-    ) {
-
-        dy += speed;
-
-    }
-
-
-    if (
-        state.keys["a"] ||
-        state.keys["ArrowLeft"]
-    ) {
-
-        dx -= speed;
-
-    }
-
-
-    if (
-        state.keys["d"] ||
-        state.keys["ArrowRight"]
-    ) {
-
-        dx += speed;
-
-    }
-
-
-    if (
-        dx !== 0 ||
-        dy !== 0
-    ) {
-
-        state.targetLocalPosition.x +=
-            dx;
-
-
-        state.targetLocalPosition.y +=
-            dy;
-
-
-        clampLocalTarget();
-
-    }
-
-
-    state.localPosition.x +=
-        (
-            state.targetLocalPosition.x -
-            state.localPosition.x
-        ) * 0.12;
-
-
-    state.localPosition.y +=
-        (
-            state.targetLocalPosition.y -
-            state.localPosition.y
-        ) * 0.12;
-
-}
-
-
-/* ============================================================
-   CLAMP POSITION
-============================================================ */
-
-function clampLocalTarget() {
-
-    state.targetLocalPosition.x =
-        Math.max(
-            8,
-            Math.min(
-                92,
-                state.targetLocalPosition.x
-            )
-        );
-
-
-    state.targetLocalPosition.y =
-        Math.max(
-            12,
-            Math.min(
-                88,
-                state.targetLocalPosition.y
-            )
-        );
-
-}
-
-
-/* ============================================================
-   KEYBOARD
-============================================================ */
-
-function handleKeyDown(
-    event
-) {
-
-    const key =
-        event.key;
-
-
-    if (
-        [
-            "ArrowUp",
-            "ArrowDown",
-            "ArrowLeft",
-            "ArrowRight",
-            " "
-        ].includes(key)
-    ) {
-
-        event.preventDefault();
-
-    }
-
-
-    state.keys[key] =
-        true;
-
-}
-
-
-function handleKeyUp(
-    event
-) {
-
-    state.keys[event.key] =
-        false;
-
-}
-
-
-/* ============================================================
-   CLICK TO WALK
-============================================================ */
-
-function handleWorldClick(
-    event
-) {
-
-    if (
-        !state.walking
-    ) {
-
-        return;
-
-    }
-
-
-    const rect =
-        dom.rhCanvas.getBoundingClientRect();
-
-
-    const x =
-        (
-            event.clientX -
-            rect.left
-        ) /
-        rect.width *
-        100;
-
-
-    const y =
-        (
-            event.clientY -
-            rect.top
-        ) /
-        rect.height *
-        100;
-
-
-    state.targetLocalPosition.x =
-        Math.max(
-            8,
-            Math.min(
-                92,
-                x
-            )
-        );
-
-
-    state.targetLocalPosition.y =
-        Math.max(
-            12,
-            Math.min(
-                88,
-                y
-            )
-        );
-
-}
-
-
-/* ============================================================
-   PRESENCE DATA CHANNEL
-============================================================ */
-
-function sendPresenceIfNeeded(
-    timestamp
-) {
-
-    if (
-        !state.dataChannel
-    ) {
-
-        return;
-
-    }
-
-
-    if (
-        state.dataChannel.readyState !==
-        "open"
-    ) {
-
-        return;
-
-    }
-
-
-    if (
-        timestamp -
-        state.lastPresenceSend <
-        50
-    ) {
-
-        return;
-
-    }
-
-
-    state.lastPresenceSend =
-        timestamp;
-
-
-    const message = {
-
-        type:
-            "presence",
-
-        position:
-            state.localPosition,
-
-        walking:
-            state.walking
-
-    };
-
-
-    try {
-
-        state.dataChannel.send(
-            JSON.stringify(
-                message
-            )
-        );
-
-    }
-
-    catch (error) {
-
-        console.warn(
-            "[RH] Presence send failed:",
-            error
-        );
-
-    }
-
-}
-
-
-/* ============================================================
-   HANDLE REMOTE PRESENCE
-============================================================ */
-
-function handleRemotePresence(
-    message
-) {
-
-    if (
-        !message.position
-    ) {
-
-        return;
-
-    }
-
-
-    state.targetRemotePosition = {
-
-        x:
-            Number(
-                message.position.x
-            ),
-
-        y:
-            Number(
-                message.position.y
-            )
-
-    };
-
-}
-
-
-/* ============================================================
-   WEB SOCKET SIGNALING
-============================================================ */
-
-function connectSignaling() {
-
-    updateDebug(
-        dom.debugSignal,
-        "Connecting"
-    );
-
-
-    updateConnectionStatus(
-        "waiting",
-        "Connecting"
-    );
-
-
-    const url =
-        `${RH_CONFIG.websocketServer}/${encodeURIComponent(state.roomId)}`;
-
-
-    console.log(
-        "[RH] Connecting to:",
-        url
-    );
-
-
-    let opened =
-        false;
-
-
-    try {
-
-        const socket =
-            new WebSocket(
-                url
-            );
-
-
-        state.websocket =
-            socket;
-
-
-        const timeout =
-            setTimeout(
-                () => {
-
-                    if (!opened) {
-
-                        console.warn(
-                            "[RH] Signaling timeout."
-                        );
-
-                        enterOfflineDemoMode();
-
-                    }
-
-                },
-                8000
-            );
-
-
-        socket.onopen =
-            () => {
-
-                opened =
-                    true;
-
-                clearTimeout(
-                    timeout
-                );
-
-
-                updateDebug(
-                    dom.debugSignal,
-                    "Connected"
-                );
-
-
-                updateConnectionStatus(
-                    "waiting",
-                    "Waiting"
-                );
-
-
-                console.log(
-                    "[RH] Signaling connected."
-                );
-
-            };
-
-
-        socket.onmessage =
-            event => {
-
-                handleSignalMessage(
-                    event.data
-                );
-
-            };
-
-
-        socket.onerror =
-            error => {
-
-                console.error(
-                    "[RH] WebSocket error:",
-                    error
-                );
-
-
-                updateDebug(
-                    dom.debugSignal,
-                    "Error"
-                );
-
-            };
-
-
-        socket.onclose =
-            () => {
-
-                console.log(
-                    "[RH] Signaling closed."
-                );
-
-
-                updateDebug(
-                    dom.debugSignal,
-                    "Closed"
-                );
-
-
-                if (
-                    !state.connected
-                ) {
-
-                    enterOfflineDemoMode();
-
-                }
-
-            };
-
-    }
-
-    catch (error) {
-
-        console.error(
-            "[RH] WebSocket creation failed:",
-            error
-        );
-
-
-        updateDebug(
-            dom.debugSignal,
-            "Failed"
-        );
-
-
-        enterOfflineDemoMode();
-
-    }
-
-}
-
-
-/* ============================================================
-   SIGNAL MESSAGE HANDLER
-============================================================ */
-
-async function handleSignalMessage(
-    rawData
-) {
-
-    let message;
-
-
-    try {
-
-        message =
-            JSON.parse(
-                rawData
-            );
-
-    }
-
-    catch (error) {
-
-        console.warn(
-            "[RH] Invalid signaling message."
-        );
-
-        return;
-
-    }
-
-
-    console.log(
-        "[RH] Signal:",
-        message
-    );
-
-
-    switch (
-        message.type
-    ) {
-
-
-        /* ----------------------------------------------------
-           Connected
-        ---------------------------------------------------- */
-
-        case "connected":
-
-            state.connectionId =
-                message.connection_id;
-
-
-            updateConnectionStatus(
-                "waiting",
-                "Waiting"
-            );
-
-            break;
-
-
-        /* ----------------------------------------------------
-           Peer joined
-        ---------------------------------------------------- */
-
-        case "peer_joined":
-
-            state.remotePeerId =
-                message.peer_id;
-
-
-            console.log(
-                "[RH] Peer joined. Becoming offerer."
-            );
-
-
-            /*
-             * IMPORTANT:
-             *
-             * Set isOfferer BEFORE createPeerConnection().
-             *
-             * This fixes the earlier data-channel bug.
-             */
-
-            state.isOfferer =
-                true;
-
-
-            await createPeerConnection();
-
-
-            await createOffer();
-
-
-            break;
-
-
-        /* ----------------------------------------------------
-           Offer
-        ---------------------------------------------------- */
-
-        case "offer":
-
-            state.remotePeerId =
-                message.sender_id;
-
-
-            state.isOfferer =
-                false;
-
-
-            await createPeerConnection();
-
-
-            await state.peerConnection.setRemoteDescription(
-                new RTCSessionDescription(
-                    message.offer
-                )
-            );
-
-
-            const answer =
-                await state.peerConnection.createAnswer();
-
-
-            await state.peerConnection.setLocalDescription(
-                answer
-            );
-
-
-            sendSignal({
-
-                type:
-                    "answer",
-
-                answer:
-                    state.peerConnection.localDescription
-
-            });
-
-
-            break;
-
-
-        /* ----------------------------------------------------
-           Answer
-        ---------------------------------------------------- */
-
-        case "answer":
-
-            if (
-                !state.peerConnection
-            ) {
-
-                return;
-
-            }
-
-
-            await state.peerConnection.setRemoteDescription(
-                new RTCSessionDescription(
-                    message.answer
-                )
-            );
-
-            break;
-
-
-        /* ----------------------------------------------------
-           ICE candidate
-        ---------------------------------------------------- */
-
-        case "ice":
-
-            if (
-                !state.peerConnection ||
-                !message.candidate
-            ) {
-
-                return;
-
-            }
-
-
-            try {
-
-                await state.peerConnection.addIceCandidate(
-                    new RTCIceCandidate(
-                        message.candidate
-                    )
-                );
-
-            }
-
-            catch (error) {
-
-                console.warn(
-                    "[RH] ICE candidate error:",
-                    error
-                );
-
-            }
-
-            break;
-
-
-        /* ----------------------------------------------------
-           Peer left
-        ---------------------------------------------------- */
-
-        case "peer_left":
-
-            handlePeerLeft();
-
-            break;
-
-
-        /* ----------------------------------------------------
-           Error
-        ---------------------------------------------------- */
-
-        case "error":
-
-            console.error(
-                "[RH] Server error:",
-                message.message
-            );
-
-
-            showToast(
-                message.message ||
-                "RH signaling error."
-            );
-
-
-            break;
-
-    }
-
-}
-
-
-/* ============================================================
-   SEND SIGNAL
-============================================================ */
-
-function sendSignal(
-    message
-) {
-
-    if (
-        !state.websocket
-    ) {
-
-        return;
-
-    }
-
-
-    if (
-        state.websocket.readyState !==
-        WebSocket.OPEN
-    ) {
-
-        return;
-
-    }
-
-
-    try {
-
-        state.websocket.send(
-            JSON.stringify(
-                message
-            )
-        );
-
-    }
-
-    catch (error) {
-
-        console.error(
-            "[RH] Signal send failed:",
-            error
-        );
-
-    }
-
-}
-
-
-/* ============================================================
-   CREATE WEBRTC PEER CONNECTION
-============================================================ */
-
-async function createPeerConnection() {
-
-    if (
-        state.peerConnection
-    ) {
-
-        return state.peerConnection;
-
-    }
-
-
-    console.log(
-        "[RH] Creating RTCPeerConnection."
-    );
-
-
-    const pc =
-        new RTCPeerConnection({
-
-            iceServers:
-                RH_CONFIG.iceServers
-
-        });
-
-
-    state.peerConnection =
-        pc;
-
-
-    /* --------------------------------------------------------
-       Local tracks
-    -------------------------------------------------------- */
-
-    if (
-        state.localStream
-    ) {
-
-        state.localStream
-            .getTracks()
-            .forEach(
-                track => {
-
-                    pc.addTrack(
-                        track,
-                        state.localStream
-                    );
-
-                }
-            );
-
-    }
-
-
-    /* --------------------------------------------------------
-       Remote track
-    -------------------------------------------------------- */
-
-    pc.ontrack =
-        event => {
-
-            console.log(
-                "[RH] Remote track received."
-            );
-
-
-            if (
-                !state.remoteStream
-            ) {
-
-                state.remoteStream =
-                    new MediaStream();
-
-            }
-
-
-            const track =
-                event.track;
-
-
-            const alreadyAdded =
-                state.remoteStream
-                    .getTracks()
-                    .some(
-                        existing =>
-                            existing.id ===
-                            track.id
-                    );
-
-
-            if (
-                !alreadyAdded
-            ) {
-
-                state.remoteStream.addTrack(
-                    track
-                );
-
-            }
-
-
-            dom.remoteVideo.srcObject =
-                state.remoteStream;
-
-
-            dom.remoteVideo.play()
-                .catch(
-                    () => {}
-                );
-
-
-            state.remoteVideoReady =
-                true;
-
-
-            dom.remotePresence.classList.remove(
-                "hidden"
-            );
-
-
-            dom.waitingMessage.classList.add(
-                "hidden"
-            );
-
-
-            updateConnectionStatus(
-                "connected",
-                "Together"
-            );
-
-
-            updateDebug(
-                dom.debugWebrtc,
-                "Connected"
-            );
-
-
-            initializeSpatialAudio();
-
-        };
-
-
-    /* --------------------------------------------------------
-       ICE candidates
-    -------------------------------------------------------- */
-
-    pc.onicecandidate =
-        event => {
-
-            if (
-                !event.candidate
-            ) {
-
-                return;
-
-            }
-
-
-            sendSignal({
-
-                type:
-                    "ice",
-
-                candidate:
-                    event.candidate
-
-            });
-
-        };
-
-
-    /* --------------------------------------------------------
-       Connection state
-    -------------------------------------------------------- */
-
-    pc.onconnectionstatechange =
-        () => {
-
-            const connectionState =
-                pc.connectionState;
-
-
-            console.log(
-                "[RH] WebRTC state:",
-                connectionState
-            );
-
-
-            updateDebug(
-                dom.debugWebrtc,
-                connectionState
-            );
-
-
-            if (
-                connectionState ===
-                "connected"
-            ) {
-
-                state.connected =
-                    true;
-
-
-                updateConnectionStatus(
-                    "connected",
-                    "Together"
-                );
-
-
-                dom.waitingMessage.classList.add(
-                    "hidden"
-                );
-
-            }
-
-
-            if (
-                connectionState ===
-                "failed"
-            ) {
-
-                updateConnectionStatus(
-                    "error",
-                    "Connection failed"
-                );
-
-
-                showToast(
-                    "WebRTC could not establish the connection."
-                );
-
-            }
-
-
-            if (
-                connectionState ===
-                "disconnected"
-            ) {
-
-                updateConnectionStatus(
-                    "waiting",
-                    "Reconnecting"
-                );
-
-            }
-
-        };
-
-
-    /* --------------------------------------------------------
-       ICE connection state
-    -------------------------------------------------------- */
-
-    pc.oniceconnectionstatechange =
-        () => {
-
-            console.log(
-                "[RH] ICE:",
-                pc.iceConnectionState
-            );
-
-        };
-
-
-    /* --------------------------------------------------------
-       Data channel
-    -------------------------------------------------------- */
-
-    if (
-        state.isOfferer
-    ) {
-
-        createDataChannel();
-
-    }
-
-
-    pc.ondatachannel =
-        event => {
-
-            console.log(
-                "[RH] Remote data channel received."
-            );
-
-
-            state.dataChannel =
-                event.channel;
-
-
-            setupDataChannel(
-                state.dataChannel
-            );
-
-        };
-
-
-    return pc;
-
-}
-
-
-/* ============================================================
-   CREATE DATA CHANNEL
-============================================================ */
-
-function createDataChannel() {
-
-    if (
-        !state.peerConnection
-    ) {
-
-        return;
-
-    }
-
-
-    if (
-        state.dataChannel
-    ) {
-
-        return;
-
-    }
-
-
-    const channel =
-        state.peerConnection.createDataChannel(
-            "rh-presence",
-            {
-
-                ordered:
-                    true
-
-            }
-        );
-
-
-    state.dataChannel =
-        channel;
-
-
-    setupDataChannel(
-        channel
-    );
-
-}
-
-
-/* ============================================================
-   SETUP DATA CHANNEL
-============================================================ */
-
-function setupDataChannel(
-    channel
-) {
-
-    channel.onopen =
-        () => {
-
-            console.log(
-                "[RH] Presence channel open."
-            );
-
-        };
-
-
-    channel.onclose =
-        () => {
-
-            console.log(
-                "[RH] Presence channel closed."
-            );
-
-        };
-
-
-    channel.onerror =
-        error => {
-
-            console.warn(
-                "[RH] Presence channel error:",
-                error
-            );
-
-        };
-
-
-    channel.onmessage =
-        event => {
-
-            try {
-
-                const message =
-                    JSON.parse(
-                        event.data
-                    );
-
-
-                if (
-                    message.type ===
-                    "presence"
-                ) {
-
-                    handleRemotePresence(
-                        message
-                    );
-
-                }
-
-            }
-
-            catch (error) {
-
-                console.warn(
-                    "[RH] Invalid presence message."
-                );
-
-            }
-
-        };
-
-}
-
-
-/* ============================================================
-   CREATE OFFER
-============================================================ */
-
-async function createOffer() {
-
-    if (
-        !state.peerConnection
-    ) {
-
-        return;
-
-    }
-
-
-    console.log(
-        "[RH] Creating offer."
-    );
-
-
-    const offer =
-        await state.peerConnection.createOffer({
-
-            offerToReceiveAudio:
-                true,
-
-            offerToReceiveVideo:
-                true
-
-        });
-
-
-    await state.peerConnection.setLocalDescription(
-        offer
-    );
-
-
-    sendSignal({
-
-        type:
-            "offer",
-
-        offer:
-            state.peerConnection.localDescription
-
-    });
-
-}
-
-
-/* ============================================================
-   SPATIAL AUDIO
-============================================================ */
-
-async function initializeAudio() {
-
-    try {
-
-        if (
-            !state.audioContext
-        ) {
-
-            state.audioContext =
-                new (
-                    window.AudioContext ||
-                    window.webkitAudioContext
-                )();
-
-        }
-
-
-        if (
-            state.audioContext.state ===
-            "suspended"
-        ) {
-
-            await state.audioContext.resume();
-
-        }
-
-    }
-
-    catch (error) {
-
-        console.warn(
-            "[RH] AudioContext unavailable:",
-            error
-        );
-
-    }
-
-}
-
-
-/* ============================================================
-   INITIALIZE SPATIAL AUDIO
-============================================================ */
-
-async function initializeSpatialAudio() {
-
-    await initializeAudio();
-
-
-    if (
-        !state.audioContext ||
-        !state.remoteStream
-    ) {
-
-        return;
-
-    }
-
-
-    if (
-        state.remotePanner
-    ) {
-
-        return;
-
-    }
-
-
-    try {
-
-        const source =
-            state.audioContext.createMediaStreamSource(
-                state.remoteStream
-            );
-
-
-        const gain =
-            state.audioContext.createGain();
-
-
-        gain.gain.value =
-            1;
-
-
-        const panner =
-            state.audioContext.createPanner();
-
-
-        panner.panningModel =
-            "HRTF";
-
-
-        panner.distanceModel =
-            "inverse";
-
-
-        panner.refDistance =
-            1;
-
-
-        panner.maxDistance =
-            30;
-
-
-        panner.rolloffFactor =
-            1.2;
-
-
-        source.connect(
-            gain
-        );
-
-
-        gain.connect(
-            panner
-        );
-
-
-        panner.connect(
-            state.audioContext.destination
-        );
-
-
-        state.remoteGain =
-            gain;
-
-
-        state.remotePanner =
-            panner;
-
-
-        /*
-         * Prevent the HTML video element from
-         * playing duplicate audio.
-         */
-
-        dom.remoteVideo.muted =
-            true;
-
-
-        console.log(
-            "[RH] Spatial audio initialized."
-        );
-
-    }
-
-    catch (error) {
-
-        console.warn(
-            "[RH] Spatial audio failed:",
-            error
-        );
-
-    }
-
-}
-
-
-/* ============================================================
-   UPDATE SPATIAL AUDIO
-============================================================ */
-
-function updateSpatialAudio() {
-
-    if (
-        !state.remotePanner
-    ) {
-
-        return;
-
-    }
-
-
-    const local =
-        screenToWorld(
-            state.localPosition
-        );
-
-
-    const remote =
-        screenToWorld(
-            state.remotePosition
-        );
-
-
-    const dx =
-        remote.x -
-        local.x;
-
-
-    const dz =
-        remote.z -
-        local.z;
-
-
-    try {
-
-        state.remotePanner.positionX.value =
-            dx;
-
-        state.remotePanner.positionY.value =
-            0;
-
-        state.remotePanner.positionZ.value =
-            dz;
-
-    }
-
-    catch (error) {
-
-        /* Browser compatibility fallback */
-
-        if (
-            state.remotePanner.setPosition
-        ) {
-
-            state.remotePanner.setPosition(
-                dx,
-                0,
-                dz
-            );
-
-        }
-
-    }
-
-}
-
-
-/* ============================================================
-   KEYBOARD MOVEMENT
-============================================================ */
-
-
-/* ============================================================
-   TOGGLE MICROPHONE
-============================================================ */
-
-function toggleMicrophone() {
-
-    if (
-        !state.localStream
-    ) {
-
-        return;
-
-    }
-
-
-    const audioTracks =
-        state.localStream.getAudioTracks();
-
-
-    if (
-        audioTracks.length === 0
-    ) {
-
-        return;
-
-    }
-
-
-    state.microphoneEnabled =
-        !state.microphoneEnabled;
-
-
-    audioTracks.forEach(
-        track => {
-
-            track.enabled =
-                state.microphoneEnabled;
-
-        }
-    );
-
-
-    updateControls();
-
-
-    showToast(
-        state.microphoneEnabled
-            ? "Microphone on"
-            : "Microphone muted"
-    );
-
-}
-
-
-/* ============================================================
-   TOGGLE CAMERA
-============================================================ */
-
-function toggleCamera() {
-
-    if (
-        !state.localStream
-    ) {
-
-        return;
-
-    }
-
-
-    const videoTracks =
-        state.localStream.getVideoTracks();
-
-
-    if (
-        videoTracks.length === 0
-    ) {
-
-        return;
-
-    }
-
-
-    state.cameraEnabled =
-        !state.cameraEnabled;
-
-
-    videoTracks.forEach(
-        track => {
-
-            track.enabled =
-                state.cameraEnabled;
-
-        }
-    );
-
-
-    updateControls();
-
-
-    showToast(
-        state.cameraEnabled
-            ? "Camera on"
-            : "Camera off"
-    );
-
-}
-
-
-/* ============================================================
-   WALKING
-============================================================ */
-
-function toggleWalking() {
-
-    state.walking =
-        !state.walking;
-
-
-    updateControls();
-
-
-    showToast(
-        state.walking
-            ? "Walking enabled"
-            : "Walking paused"
-    );
-
-}
-
-
-/* ============================================================
-   MEET
-============================================================ */
-
-function moveCloserToPerson() {
-
-    if (
-        state.remoteStream
-    ) {
-
-        state.targetLocalPosition = {
-
-            x:
-                state.remotePosition.x -
-                8,
-
-            y:
-                state.remotePosition.y
-
-        };
-
-
-        clampLocalTarget();
-
-
-        showToast(
-            "Walking closer..."
-        );
-
-    }
-
-    else {
-
-        showToast(
-            "Waiting for your person."
-        );
-
-    }
-
-}
-
-
-/* ============================================================
-   CONTROLS UI
-============================================================ */
-
-function updateControls() {
-
-    if (
-        state.microphoneEnabled
-    ) {
-
-        dom.muteBtn.innerHTML =
-            "🎙️<span>Mute</span>";
-
-    }
-
-    else {
-
-        dom.muteBtn.innerHTML =
-            "🔇<span>Muted</span>";
-
-    }
-
-
-    if (
-        state.cameraEnabled
-    ) {
-
-        dom.cameraBtn.innerHTML =
-            "📷<span>Camera</span>";
-
-    }
-
-    else {
-
-        dom.cameraBtn.innerHTML =
-            "🚫<span>Camera Off</span>";
-
-    }
-
-
-    if (
-        state.walking
-    ) {
-
-        dom.walkBtn.classList.add(
-            "active"
-        );
-
-        dom.walkBtn.innerHTML =
-            "🚶<span>Walking</span>";
-
-    }
-
-    else {
-
-        dom.walkBtn.classList.remove(
-            "active"
-        );
-
-        dom.walkBtn.innerHTML =
-            "⏸️<span>Paused</span>";
-
-    }
-
-}
-
-
-/* ============================================================
-   CONNECTION STATUS
-============================================================ */
-
-function updateConnectionStatus(
-    status,
-    text
-) {
-
-    dom.connectionText.textContent =
-        text;
-
-
-    dom.connectionDot.className =
-        "status-dot " +
-        status;
-
-}
+const toast =
+  $("toast");
 
 
 /* ============================================================
    DEBUG
-============================================================ */
+   ============================================================ */
 
-function updateHttpsDebug() {
+function setDebug(id, value) {
 
-    const secure =
-        window.isSecureContext ||
-        location.hostname ===
-        "localhost";
+  const element =
+    $(id);
 
-
-    updateDebug(
-        dom.debugHttps,
-        secure
-            ? "OK"
-            : "Required"
-    );
-
-}
-
-
-function updateDebug(
-    element,
-    value
-) {
-
-    if (
-        element
-    ) {
-
-        element.textContent =
-            value;
-
-    }
-
-}
-
-
-/* ============================================================
-   PLACE THEME
-============================================================ */
-
-function updatePlaceUI() {
-
-    const names = {
-
-        park:
-            "Quiet Park",
-
-        temple:
-            "Devotional Place",
-
-        shopping:
-            "Shopping Street",
-
-        campus:
-            "Campus"
-
-    };
-
-
-    dom.placeName.textContent =
-        names[state.selectedPlace] ||
-        "Shared Place";
-
-}
-
-
-/* ============================================================
-   RESIZE
-============================================================ */
-
-function handleResize() {
-
-    if (
-        !state.three.camera ||
-        !state.three.renderer
-    ) {
-
-        return;
-
-    }
-
-
-    state.three.camera.aspect =
-        window.innerWidth /
-        window.innerHeight;
-
-
-    state.three.camera.updateProjectionMatrix();
-
-
-    state.three.renderer.setSize(
-        window.innerWidth,
-        window.innerHeight
-    );
-
-}
-
-
-/* ============================================================
-   ROOM COPY
-============================================================ */
-
-async function copyRoom() {
-
-    const text =
-        `Join my RH room: ${state.roomId}`;
-
-
-    try {
-
-        await navigator.clipboard.writeText(
-            text
-        );
-
-
-        showToast(
-            "RH room copied."
-        );
-
-    }
-
-    catch (error) {
-
-        showToast(
-            `Room: ${state.roomId}`
-        );
-
-    }
-
-}
-
-
-/* ============================================================
-   EXIT
-============================================================ */
-
-function exitRH() {
-
-    if (
-        state.websocket
-    ) {
-
-        try {
-
-            state.websocket.close();
-
-        }
-
-        catch (error) {}
-
-    }
-
-
-    if (
-        state.peerConnection
-    ) {
-
-        try {
-
-            state.peerConnection.close();
-
-        }
-
-        catch (error) {}
-
-    }
-
-
-    if (
-        state.localStream
-    ) {
-
-        state.localStream
-            .getTracks()
-            .forEach(
-                track =>
-                    track.stop()
-            );
-
-    }
-
-
-    state.websocket =
-        null;
-
-    state.peerConnection =
-        null;
-
-    state.dataChannel =
-        null;
-
-    state.remoteStream =
-        null;
-
-    state.localStream =
-        null;
-
-    state.connected =
-        false;
-
-
-    dom.localVideo.srcObject =
-        null;
-
-    dom.remoteVideo.srcObject =
-        null;
-
-
-    dom.remotePresence.classList.add(
-        "hidden"
-    );
-
-
-    dom.waitingMessage.classList.remove(
-        "hidden"
-    );
-
-
-    showScreen(
-        "welcome"
-    );
-
-
-    updateConnectionStatus(
-        "waiting",
-        "Ready"
-    );
-
-
-    updateDebug(
-        dom.debugCamera,
-        "—"
-    );
-
-
-    updateDebug(
-        dom.debugSignal,
-        "—"
-    );
-
-
-    updateDebug(
-        dom.debugWebrtc,
-        "—"
-    );
-
-}
-
-
-/* ============================================================
-   PEER LEFT
-============================================================ */
-
-function handlePeerLeft() {
-
-    console.log(
-        "[RH] Peer left."
-    );
-
-
-    state.remoteStream =
-        null;
-
-
-    dom.remoteVideo.srcObject =
-        null;
-
-
-    dom.remotePresence.classList.add(
-        "hidden"
-    );
-
-
-    dom.waitingMessage.classList.remove(
-        "hidden"
-    );
-
-
-    updateConnectionStatus(
-        "waiting",
-        "Waiting"
-    );
-
-
-    updateDebug(
-        dom.debugWebrtc,
-        "Waiting"
-    );
-
-
-    if (
-        state.remotePanner
-    ) {
-
-        try {
-
-            state.remotePanner.disconnect();
-
-        }
-
-        catch (error) {}
-
-    }
-
-
-    state.remotePanner =
-        null;
-
-
-    state.remoteGain =
-        null;
-
-
-    if (
-        state.peerConnection
-    ) {
-
-        try {
-
-            state.peerConnection.close();
-
-        }
-
-        catch (error) {}
-
-    }
-
-
-    state.peerConnection =
-        null;
-
-
-    state.dataChannel =
-        null;
-
-
-    state.remotePeerId =
-        null;
-
-
-    state.isOfferer =
-        false;
-
-
-    showToast(
-        "Your person left the RH room."
-    );
-
-}
-
-
-/* ============================================================
-   OFFLINE DEMO MODE
-============================================================ */
-
-function enterOfflineDemoMode() {
-
-    console.log(
-        "[RH] Entering offline demo mode."
-    );
-
-
-    updateDebug(
-        dom.debugSignal,
-        "Offline"
-    );
-
-
-    updateDebug(
-        dom.debugWebrtc,
-        "Demo"
-    );
-
-
-    updateConnectionStatus(
-        "waiting",
-        "Demo Mode"
-    );
-
-
-    dom.waitingMessage.innerHTML = `
-
-        <div class="waiting-icon">
-            ✨
-        </div>
-
-        <div>
-
-            <strong>
-                RH Demo Mode
-            </strong>
-
-            <span>
-                Move around the shared environment.
-            </span>
-
-        </div>
-
-    `;
-
-
-    dom.waitingMessage.classList.add(
-        "hidden"
-    );
-
-
-    /*
-     * This keeps the visual experience interactive
-     * even when the Colab signaling server is unavailable.
-     *
-     * It does NOT create a fake remote person.
-     */
-
-    showToast(
-        "RH is running in visual demo mode."
-    );
+  if (element) {
+    element.textContent =
+      value;
+  }
 
 }
 
 
 /* ============================================================
    TOAST
-============================================================ */
+   ============================================================ */
 
-let toastTimer =
-    null;
+function toastMsg(message) {
 
+  toast.textContent =
+    message;
 
-function showToast(
-    message
-) {
+  toast.classList.add(
+    "show"
+  );
 
-    dom.toastText.textContent =
-        message;
+  clearTimeout(
+    toastMsg.timer
+  );
 
+  toastMsg.timer =
+    setTimeout(() => {
 
-    dom.toast.classList.add(
+      toast.classList.remove(
         "show"
-    );
+      );
 
-
-    clearTimeout(
-        toastTimer
-    );
-
-
-    toastTimer =
-        setTimeout(
-            () => {
-
-                dom.toast.classList.remove(
-                    "show"
-                );
-
-            },
-            2500
-        );
+    }, 2600);
 
 }
 
 
 /* ============================================================
-   WORLD INITIALIZATION PATCH
-============================================================ */
+   CONNECTION STATUS
+   ============================================================ */
 
-const originalPrepareWorld =
-    prepareWorld;
+function setConnection(
+  label,
+  connected = false
+) {
+
+  connectionState.textContent =
+    label;
+
+  connectionState.classList.toggle(
+    "connected",
+    connected
+  );
+
+}
 
 
-/*
- * We wrap prepareWorld so the selected place
- * label is always updated.
- */
+/* ============================================================
+   ROOM NORMALIZATION
+   ============================================================ */
 
-prepareWorld =
-    function () {
+function safeRoom(value) {
 
-        updatePlaceUI();
+  return (
 
-        originalPrepareWorld();
+    value ||
+
+    RH_CONFIG.ROOM_DEFAULT
+
+  )
+    .trim()
+    .replace(
+      /[^a-zA-Z0-9_-]/g,
+      "-"
+    )
+    .slice(
+      0,
+      32
+    )
+    .toUpperCase();
+
+}
+
+
+/* ============================================================
+   HTTPS CHECK
+   ============================================================ */
+
+function updateSecureStatus() {
+
+  const secure =
+    window.isSecureContext ||
+    location.hostname === "localhost";
+
+
+  $("secureCheck").textContent =
+    `● HTTPS ${secure ? "OK" : "REQUIRED"}`;
+
+
+  setDebug(
+    "debugHttps",
+    secure ? "OK" : "FAIL"
+  );
+
+
+  return secure;
+
+}
+
+
+/* ============================================================
+   START RH
+   ============================================================ */
+
+async function startRH() {
+
+  if (state.running)
+    return;
+
+
+  state.running =
+    true;
+
+
+  state.roomId =
+    safeRoom(
+      roomInput.value
+    );
+
+
+  roomInput.value =
+    state.roomId;
+
+
+  roomLabel.textContent =
+    state.roomId;
+
+
+  lobby.classList.remove(
+    "active"
+  );
+
+
+  world.classList.add(
+    "active"
+  );
+
+
+  setConnection(
+    "Starting…"
+  );
+
+
+  participantCount.textContent =
+    "1 / 2";
+
+
+  updateSecureStatus();
+
+
+  /*
+   * Start the environment.
+   */
+
+  initWorld();
+
+
+  /*
+   * CAMERA MUST START BEFORE
+   * SIGNALING.
+   */
+
+  try {
+
+    await startCamera();
+
+  }
+
+  catch (error) {
+
+    state.running =
+      false;
+
+    console.error(
+      error
+    );
+
+    toastMsg(
+      error.message ||
+      "Camera could not start."
+    );
+
+    setConnection(
+      "Camera error"
+    );
+
+    return;
+
+  }
+
+
+  /*
+   * Start segmentation after
+   * the camera is actually available.
+   */
+
+  await initializeSegmentation();
+
+
+  /*
+   * Finally connect to cloud signaling.
+   */
+
+  connectSignal();
+
+}
+
+
+/* ============================================================
+   CAMERA
+   ============================================================ */
+
+async function startCamera() {
+
+  if (!updateSecureStatus()) {
+
+    throw new Error(
+      "RH needs HTTPS. Open the GitHub Pages URL instead of a local file."
+    );
+
+  }
+
+
+  if (
+    !navigator.mediaDevices ||
+    !navigator.mediaDevices.getUserMedia
+  ) {
+
+    throw new Error(
+      "This browser does not expose camera access."
+    );
+
+  }
+
+
+  /*
+   * Request real camera + real microphone.
+   */
+
+  state.localStream =
+    await navigator.mediaDevices.getUserMedia({
+
+      video: {
+
+        width: {
+          ideal: 1280
+        },
+
+        height: {
+          ideal: 720
+        },
+
+        facingMode:
+          "user"
+
+      },
+
+      audio: {
+
+        echoCancellation:
+          true,
+
+        noiseSuppression:
+          true,
+
+        autoGainControl:
+          true
+
+      }
+
+    });
+
+
+  const video =
+    $("localVideo");
+
+
+  video.srcObject =
+    state.localStream;
+
+
+  /*
+   * Wait until browser has actual video metadata.
+   */
+
+  await new Promise(
+    resolve => {
+
+      if (
+        video.readyState >= 2
+      ) {
+
+        resolve();
+
+      }
+
+      else {
+
+        video.onloadedmetadata =
+          () => resolve();
+
+      }
+
+    }
+  );
+
+
+  await video.play();
+
+
+  const track =
+    state.localStream
+      .getVideoTracks()[0];
+
+
+  const settings =
+    track.getSettings();
+
+
+  $("mediaCheck").textContent =
+    "● Camera OK";
+
+
+  setDebug(
+    "debugCamera",
+    `${settings.width || "?"}×${settings.height || "?"}`
+  );
+
+
+  /*
+   * Canvas becomes the source texture
+   * for the real human inside the world.
+   */
+
+  const canvas =
+    $("localCanvas");
+
+
+  canvas.width =
+    settings.width ||
+    1280;
+
+
+  canvas.height =
+    settings.height ||
+    720;
+
+
+  setDebug(
+    "debugCanvas",
+    "READY"
+  );
+
+
+  state.cameraOn =
+    true;
+
+
+  /*
+   * Immediate fallback render.
+   *
+   * This is important.
+   *
+   * If MediaPipe fails, the user's camera
+   * still renders instead of becoming blank.
+   */
+
+  renderLocalFallback();
+
+
+  /*
+   * Create the person mesh.
+   */
+
+  makeHumanMeshes();
+
+
+  toastMsg(
+    "Camera is live. You are the real person in RH."
+  );
+
+}
+
+
+/* ============================================================
+   FALLBACK CAMERA RENDER
+   ============================================================ */
+
+function renderLocalFallback() {
+
+  const video =
+    $("localVideo");
+
+
+  const canvas =
+    $("localCanvas");
+
+
+  const ctx =
+    canvas.getContext(
+      "2d"
+    );
+
+
+  const loop = () => {
+
+    if (!state.running)
+      return;
+
+
+    if (
+      video.readyState >= 2
+    ) {
+
+      if (
+        canvas.width !==
+        video.videoWidth
+      ) {
+
+        canvas.width =
+          video.videoWidth ||
+          canvas.width;
+
+      }
+
+
+      if (
+        canvas.height !==
+        video.videoHeight
+      ) {
+
+        canvas.height =
+          video.videoHeight ||
+          canvas.height;
+
+      }
+
+
+      ctx.save();
+
+
+      /*
+       * Mirror selfie camera.
+       */
+
+      ctx.translate(
+        canvas.width,
+        0
+      );
+
+
+      ctx.scale(
+        -1,
+        1
+      );
+
+
+      ctx.drawImage(
+        video,
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
+
+
+      ctx.restore();
+
+
+      if (
+        state.humanLocalTexture
+      ) {
+
+        state.humanLocalTexture
+          .needsUpdate = true;
+
+      }
+
+    }
+
+
+    requestAnimationFrame(
+      loop
+    );
+
+  };
+
+
+  requestAnimationFrame(
+    loop
+  );
+
+}
+
+
+/* ============================================================
+   MEDIAPIPE SEGMENTATION
+   ============================================================ */
+
+async function initializeSegmentation() {
+
+  /*
+   * If CDN failed, RH still works with fallback camera.
+   */
+
+  if (
+    typeof SelfieSegmentation ===
+    "undefined"
+  ) {
+
+    setDebug(
+      "debugSeg",
+      "CDN unavailable"
+    );
+
+    return;
+
+  }
+
+
+  try {
+
+    state.segmentation =
+      new SelfieSegmentation({
+
+        locateFile:
+          file =>
+            `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
+
+      });
+
+
+    state.segmentation.setOptions({
+
+      modelSelection:
+        1
+
+    });
+
+
+    state.segmentation.onResults(
+      results => {
+
+        const canvas =
+          $("localCanvas");
+
+
+        const ctx =
+          canvas.getContext(
+            "2d"
+          );
+
+
+        if (
+          !results.image
+        )
+          return;
+
+
+        canvas.width =
+          results.image.width;
+
+
+        canvas.height =
+          results.image.height;
+
+
+        /*
+         * Mirror image + mask together.
+         */
+
+        ctx.save();
+
+
+        ctx.clearRect(
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+
+
+        ctx.translate(
+          canvas.width,
+          0
+        );
+
+
+        ctx.scale(
+          -1,
+          1
+        );
+
+
+        /*
+         * Draw actual camera.
+         */
+
+        ctx.drawImage(
+          results.image,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+
+
+        /*
+         * Keep only the human.
+         */
+
+        ctx.globalCompositeOperation =
+          "destination-in";
+
+
+        ctx.drawImage(
+          results.segmentationMask,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+
+
+        ctx.restore();
+
+
+        ctx.globalCompositeOperation =
+          "source-over";
+
+
+        state.segmentationReady =
+          true;
+
+
+        setDebug(
+          "debugSeg",
+          "LIVE"
+        );
+
+
+        if (
+          state.humanLocalTexture
+        ) {
+
+          state.humanLocalTexture
+            .needsUpdate = true;
+
+        }
+
+      }
+    );
+
+
+    setDebug(
+      "debugSeg",
+      "READY"
+    );
+
+
+    segmentationLoop();
+
+  }
+
+  catch (error) {
+
+    console.warn(
+      "Segmentation unavailable",
+      error
+    );
+
+
+    setDebug(
+      "debugSeg",
+      "FALLBACK"
+    );
+
+  }
+
+}
+
+
+/* ============================================================
+   SEGMENTATION LOOP
+   ============================================================ */
+
+async function segmentationLoop() {
+
+  if (
+    !state.running ||
+    !state.segmentation
+  )
+    return;
+
+
+  const video =
+    $("localVideo");
+
+
+  if (
+    !state.segmentBusy &&
+    video.readyState >= 2
+  ) {
+
+    state.segmentBusy =
+      true;
+
+
+    try {
+
+      await state.segmentation.send({
+
+        image:
+          video
+
+      });
+
+    }
+
+    catch (error) {
+
+      console.warn(
+        "Segmentation frame error",
+        error
+      );
+
+    }
+
+
+    state.segmentBusy =
+      false;
+
+  }
+
+
+  requestAnimationFrame(
+    segmentationLoop
+  );
+
+}
+
+
+/* ============================================================
+   THREE.JS WORLD
+   ============================================================ */
+
+function initWorld() {
+
+  if (state.renderer)
+    return;
+
+
+  state.scene =
+    new THREE.Scene();
+
+
+  state.scene.background =
+    new THREE.Color(
+      0x071016
+    );
+
+
+  state.scene.fog =
+    new THREE.Fog(
+      0x071016,
+      10,
+      38
+    );
+
+
+  /*
+   * CAMERA
+   */
+
+  state.camera =
+    new THREE.PerspectiveCamera(
+      58,
+      innerWidth / innerHeight,
+      0.1,
+      100
+    );
+
+
+  state.camera.position.set(
+    0,
+    5.2,
+    8.5
+  );
+
+
+  state.camera.lookAt(
+    0,
+    0,
+    0
+  );
+
+
+  /*
+   * RENDERER
+   */
+
+  state.renderer =
+    new THREE.WebGLRenderer({
+
+      canvas:
+        $("rhCanvas"),
+
+      antialias:
+        true,
+
+      alpha:
+        false
+
+    });
+
+
+  state.renderer.setPixelRatio(
+    Math.min(
+      devicePixelRatio,
+      2
+    )
+  );
+
+
+  state.renderer.setSize(
+    innerWidth,
+    innerHeight
+  );
+
+
+  state.renderer.shadowMap.enabled =
+    true;
+
+
+  state.clock =
+    new THREE.Clock();
+
+
+  /* ==========================================================
+     LIGHTING
+     ========================================================== */
+
+  const hemisphere =
+    new THREE.HemisphereLight(
+      0xdbe8ff,
+      0x132018,
+      2.1
+    );
+
+
+  state.scene.add(
+    hemisphere
+  );
+
+
+  const sun =
+    new THREE.DirectionalLight(
+      0xfff2d2,
+      2.7
+    );
+
+
+  sun.position.set(
+    -7,
+    12,
+    6
+  );
+
+
+  sun.castShadow =
+    true;
+
+
+  state.scene.add(
+    sun
+  );
+
+
+  /* ==========================================================
+     GROUND
+     ========================================================== */
+
+  const ground =
+    new THREE.Mesh(
+
+      new THREE.PlaneGeometry(
+        60,
+        60
+      ),
+
+      new THREE.MeshStandardMaterial({
+
+        color:
+          0x18241e,
+
+        roughness:
+          1
+
+      })
+
+    );
+
+
+  ground.rotation.x =
+    -Math.PI / 2;
+
+
+  ground.receiveShadow =
+    true;
+
+
+  state.scene.add(
+    ground
+  );
+
+
+  /* ==========================================================
+     WALKING PATH
+     ========================================================== */
+
+  const path =
+    new THREE.Mesh(
+
+      new THREE.PlaneGeometry(
+        5.2,
+        55
+      ),
+
+      new THREE.MeshStandardMaterial({
+
+        color:
+          0x4b4a46,
+
+        roughness:
+          1
+
+      })
+
+    );
+
+
+  path.rotation.x =
+    -Math.PI / 2;
+
+
+  path.position.y =
+    0.015;
+
+
+  state.scene.add(
+    path
+  );
+
+
+  /* ==========================================================
+     TREES
+     ========================================================== */
+
+  for (
+    let i = 0;
+    i < 22;
+    i++
+  ) {
+
+    const tree =
+      new THREE.Group();
+
+
+    const trunk =
+      new THREE.Mesh(
+
+        new THREE.CylinderGeometry(
+          0.10,
+          0.15,
+          1.4,
+          8
+        ),
+
+        new THREE.MeshStandardMaterial({
+
+          color:
+            0x5c3f2b
+
+        })
+
+      );
+
+
+    trunk.position.y =
+      0.7;
+
+
+    const crown =
+      new THREE.Mesh(
+
+        new THREE.SphereGeometry(
+          0.62 +
+          Math.random() * 0.35,
+          10,
+          10
+        ),
+
+        new THREE.MeshStandardMaterial({
+
+          color:
+            0x31583d,
+
+          roughness:
+            1
+
+        })
+
+      );
+
+
+    crown.position.y =
+      1.65;
+
+
+    tree.add(
+      trunk,
+      crown
+    );
+
+
+    tree.position.set(
+
+      (
+        Math.random() < 0.5
+          ? -1
+          : 1
+      ) *
+      (
+        4.1 +
+        Math.random() * 3
+      ),
+
+      0,
+
+      -18 +
+      i * 2.1 +
+      (
+        Math.random() - 0.5
+      )
+
+    );
+
+
+    state.scene.add(
+      tree
+    );
+
+  }
+
+
+  /* ==========================================================
+     WATER
+     ========================================================== */
+
+  const water =
+    new THREE.Mesh(
+
+      new THREE.PlaneGeometry(
+        14,
+        60
+      ),
+
+      new THREE.MeshStandardMaterial({
+
+        color:
+          0x14333a,
+
+        roughness:
+          0.25,
+
+        metalness:
+          0.05
+
+      })
+
+    );
+
+
+  water.rotation.x =
+    -Math.PI / 2;
+
+
+  water.position.set(
+    -10,
+    -0.01,
+    -4
+  );
+
+
+  state.scene.add(
+    water
+  );
+
+
+  makeHumanMeshes();
+
+
+  window.addEventListener(
+    "resize",
+    resizeWorld
+  );
+
+
+  /*
+   * Keyboard movement.
+   */
+
+  document.addEventListener(
+    "keydown",
+    event => {
+
+      if (
+        ["INPUT", "TEXTAREA"]
+          .includes(
+            document.activeElement?.tagName
+          )
+      )
+        return;
+
+
+      state.keys.add(
+        event.key.toLowerCase()
+      );
+
+
+      if (
+        [
+          "arrowup",
+          "arrowdown",
+          "arrowleft",
+          "arrowright",
+          " "
+        ].includes(
+          event.key.toLowerCase()
+        )
+      ) {
+
+        event.preventDefault();
+
+      }
+
+    }
+  );
+
+
+  document.addEventListener(
+    "keyup",
+    event => {
+
+      state.keys.delete(
+        event.key.toLowerCase()
+      );
+
+    }
+  );
+
+
+  $("rhCanvas")
+    .addEventListener(
+      "click",
+      onWorldClick
+    );
+
+
+  animate();
+
+}
+
+
+/* ============================================================
+   REAL PERSON MESHES
+   ============================================================ */
+
+function makeHumanMeshes() {
+
+  if (
+    !state.scene ||
+    !state.localStream
+  )
+    return;
+
+
+  /* ==========================================================
+     LOCAL PERSON
+     ========================================================== */
+
+  if (
+    !state.humanLocalTexture
+  ) {
+
+    const canvas =
+      $("localCanvas");
+
+
+    state.humanLocalTexture =
+      new THREE.CanvasTexture(
+        canvas
+      );
+
+
+    state.humanLocalTexture.colorSpace =
+      THREE.SRGBColorSpace;
+
+  }
+
+
+  if (
+    !state.humanLocal
+  ) {
+
+    const material =
+      new THREE.MeshBasicMaterial({
+
+        map:
+          state.humanLocalTexture,
+
+        transparent:
+          true,
+
+        side:
+          THREE.DoubleSide,
+
+        depthWrite:
+          false
+
+      });
+
+
+    state.humanLocal =
+      new THREE.Mesh(
+
+        new THREE.PlaneGeometry(
+          2.35,
+          3.05
+        ),
+
+        material
+
+      );
+
+
+    state.humanLocal.position.set(
+      0,
+      1.53,
+      0
+    );
+
+
+    state.scene.add(
+      state.humanLocal
+    );
+
+  }
+
+
+  /* ==========================================================
+     REMOTE PERSON
+     ========================================================== */
+
+  if (
+    !state.humanRemoteTexture
+  ) {
+
+    const canvas =
+      $("remoteCanvas");
+
+
+    state.humanRemoteTexture =
+      new THREE.CanvasTexture(
+        canvas
+      );
+
+
+    state.humanRemoteTexture.colorSpace =
+      THREE.SRGBColorSpace;
+
+  }
+
+
+  if (
+    !state.humanRemote
+  ) {
+
+    const material =
+      new THREE.MeshBasicMaterial({
+
+        map:
+          state.humanRemoteTexture,
+
+        transparent:
+          true,
+
+        side:
+          THREE.DoubleSide,
+
+        depthWrite:
+          false
+
+      });
+
+
+    state.humanRemote =
+      new THREE.Mesh(
+
+        new THREE.PlaneGeometry(
+          2.35,
+          3.05
+        ),
+
+        material
+
+      );
+
+
+    state.humanRemote.position.set(
+
+      state.remotePosition.x,
+
+      1.53,
+
+      state.remotePosition.z
+
+    );
+
+
+    /*
+     * The remote human stays invisible
+     * until WebRTC actually delivers video.
+     */
+
+    state.humanRemote.visible =
+      false;
+
+
+    state.scene.add(
+      state.humanRemote
+    );
+
+  }
+
+}
+
+
+/* ============================================================
+   REMOTE CAMERA
+   ============================================================ */
+
+function drawRemoteVideo() {
+
+  const video =
+    $("remoteVideo");
+
+
+  const canvas =
+    $("remoteCanvas");
+
+
+  if (!video.videoWidth)
+    return;
+
+
+  if (
+    canvas.width !==
+    video.videoWidth
+  ) {
+
+    canvas.width =
+      video.videoWidth;
+
+  }
+
+
+  if (
+    canvas.height !==
+    video.videoHeight
+  ) {
+
+    canvas.height =
+      video.videoHeight;
+
+  }
+
+
+  const ctx =
+    canvas.getContext(
+      "2d"
+    );
+
+
+  ctx.save();
+
+
+  ctx.translate(
+    canvas.width,
+    0
+  );
+
+
+  ctx.scale(
+    -1,
+    1
+  );
+
+
+  ctx.clearRect(
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
+
+
+  ctx.drawImage(
+    video,
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
+
+
+  ctx.restore();
+
+
+  if (
+    state.humanRemoteTexture
+  ) {
+
+    state.humanRemoteTexture
+      .needsUpdate = true;
+
+  }
+
+}
+
+
+/* ============================================================
+   ANIMATION
+   ============================================================ */
+
+function animate() {
+
+  state.animation =
+    requestAnimationFrame(
+      animate
+    );
+
+
+  const dt =
+    Math.min(
+      state.clock.getDelta(),
+      0.05
+    );
+
+
+  if (
+    state.running &&
+    state.walking
+  ) {
+
+    updateMovement(
+      dt
+    );
+
+  }
+
+
+  /* ==========================================================
+     LOCAL PERSON
+     ========================================================== */
+
+  if (
+    state.humanLocal
+  ) {
+
+    state.humanLocal.position.x =
+      state.position.x;
+
+
+    state.humanLocal.position.z =
+      state.position.z;
+
+
+    state.humanLocal.lookAt(
+
+      state.camera.position.x,
+
+      state.humanLocal.position.y,
+
+      state.camera.position.z
+
+    );
+
+  }
+
+
+  /* ==========================================================
+     REMOTE PERSON
+     ========================================================== */
+
+  if (
+    state.humanRemote
+  ) {
+
+    state.humanRemote.position.x +=
+
+      (
+        state.remotePosition.x -
+        state.humanRemote.position.x
+      ) *
+      0.12;
+
+
+    state.humanRemote.position.z +=
+
+      (
+        state.remotePosition.z -
+        state.humanRemote.position.z
+      ) *
+      0.12;
+
+
+    state.humanRemote.lookAt(
+
+      state.camera.position.x,
+
+      state.humanRemote.position.y,
+
+      state.camera.position.z
+
+    );
+
+  }
+
+
+  /* ==========================================================
+     CAMERA FOLLOW
+     ========================================================== */
+
+  state.camera.position.x +=
+
+    (
+      state.position.x * 0.38 -
+      state.camera.position.x
+    ) *
+    0.035;
+
+
+  state.camera.position.z +=
+
+    (
+      state.position.z + 8.2 -
+      state.camera.position.z
+    ) *
+    0.035;
+
+
+  state.camera.lookAt(
+
+    state.position.x,
+
+    1.25,
+
+    state.position.z - 4
+
+  );
+
+
+  state.renderer.render(
+    state.scene,
+    state.camera
+  );
+
+}
+
+
+/* ============================================================
+   MOVEMENT
+   ============================================================ */
+
+function updateMovement(dt) {
+
+  let dx = 0;
+
+  let dz = 0;
+
+
+  if (
+    state.keys.has("w") ||
+    state.keys.has("arrowup")
+  ) {
+
+    dz -= 1;
+
+  }
+
+
+  if (
+    state.keys.has("s") ||
+    state.keys.has("arrowdown")
+  ) {
+
+    dz += 1;
+
+  }
+
+
+  if (
+    state.keys.has("a") ||
+    state.keys.has("arrowleft")
+  ) {
+
+    dx -= 1;
+
+  }
+
+
+  if (
+    state.keys.has("d") ||
+    state.keys.has("arrowright")
+  ) {
+
+    dx += 1;
+
+  }
+
+
+  if (
+    dx === 0 &&
+    dz === 0
+  )
+    return;
+
+
+  const length =
+    Math.hypot(
+      dx,
+      dz
+    ) || 1;
+
+
+  const speed =
+    3.0;
+
+
+  state.position.x +=
+
+    (
+      dx / length
+    ) *
+    speed *
+    dt;
+
+
+  state.position.z +=
+
+    (
+      dz / length
+    ) *
+    speed *
+    dt;
+
+
+  /*
+   * Keep people on the path.
+   */
+
+  state.position.x =
+    Math.max(
+      -2,
+      Math.min(
+        2,
+        state.position.x
+      )
+    );
+
+
+  state.position.z =
+    Math.max(
+      -16,
+      Math.min(
+        8,
+        state.position.z
+      )
+    );
+
+
+  sendPresence();
+
+}
+
+
+/* ============================================================
+   CLICK TO WALK
+   ============================================================ */
+
+function onWorldClick(event) {
+
+  if (!state.running)
+    return;
+
+
+  const rect =
+    $("rhCanvas")
+      .getBoundingClientRect();
+
+
+  const normalizedX =
+
+    (
+      event.clientX -
+      rect.left
+    ) /
+    rect.width *
+    2 -
+    1;
+
+
+  state.position.x +=
+    normalizedX * 0.9;
+
+
+  state.position.x =
+    Math.max(
+      -2,
+      Math.min(
+        2,
+        state.position.x
+      )
+    );
+
+
+  sendPresence();
+
+}
+
+
+/* ============================================================
+   WEBRTC PRESENCE DATA
+   ============================================================ */
+
+function sendPresence() {
+
+  if (
+    state.dataChannel &&
+    state.dataChannel.readyState ===
+      "open"
+  ) {
+
+    state.dataChannel.send(
+
+      JSON.stringify({
+
+        type:
+          "presence",
+
+        x:
+          state.position.x,
+
+        z:
+          state.position.z,
+
+        ts:
+          Date.now()
+
+      })
+
+    );
+
+  }
+
+}
+
+
+/* ============================================================
+   CLOUD SIGNALING
+   ============================================================ */
+
+function connectSignal() {
+
+  const base =
+    RH_CONFIG.SIGNALING_URL
+      .replace(
+        /\/$/,
+        ""
+      );
+
+
+  /*
+   * Prevent confusing WebSocket errors
+   * before backend URL is configured.
+   */
+
+  if (
+    base.includes(
+      "REPLACE-WITH-YOUR"
+    )
+  ) {
+
+    setConnection(
+      "Backend URL needed"
+    );
+
+
+    setDebug(
+      "debugSignal",
+      "CONFIG"
+    );
+
+
+    toastMsg(
+      "Deploy the backend, then paste its wss:// URL into app.js."
+    );
+
+
+    return;
+
+  }
+
+
+  clearTimeout(
+    state.reconnectTimer
+  );
+
+
+  setConnection(
+    "Connecting…"
+  );
+
+
+  setDebug(
+    "debugSignal",
+    "CONNECTING"
+  );
+
+
+  const url =
+    `${base}/${encodeURIComponent(
+      state.roomId
+    )}`;
+
+
+  console.log(
+    "[RH] Connecting:",
+    url
+  );
+
+
+  state.ws =
+    new WebSocket(
+      url
+    );
+
+
+  /* ==========================================================
+     SIGNAL CONNECTED
+     ========================================================== */
+
+  state.ws.onopen =
+    () => {
+
+      state.wsReady =
+        true;
+
+
+      state.reconnectAttempt =
+        0;
+
+
+      setConnection(
+        "Signal connected"
+      );
+
+
+      setDebug(
+        "debugSignal",
+        "CONNECTED"
+      );
+
+
+      $("signalCheck").textContent =
+        "● Signal OK";
+
+
+      sendSignal({
+
+        type:
+          "hello"
+
+      });
 
     };
 
 
-/* ============================================================
-   VISIBILITY HANDLING
-============================================================ */
+  /* ==========================================================
+     SIGNAL MESSAGE
+     ========================================================== */
 
-document.addEventListener(
-    "visibilitychange",
-    async () => {
+  state.ws.onmessage =
+    async event => {
 
-        if (
-            document.visibilityState ===
-            "visible"
-        ) {
-
-            if (
-                state.audioContext &&
-                state.audioContext.state ===
-                "suspended"
-            ) {
-
-                try {
-
-                    await state.audioContext.resume();
-
-                }
-
-                catch (error) {}
-
-            }
-
-        }
-
-    }
-);
+      let message;
 
 
-/* ============================================================
-   CAMERA TRACK ENDED
-============================================================ */
+      try {
 
-function monitorLocalTracks() {
+        message =
+          JSON.parse(
+            event.data
+          );
 
-    if (
-        !state.localStream
-    ) {
+      }
+
+      catch {
 
         return;
 
-    }
+      }
 
 
-    state.localStream
-        .getTracks()
-        .forEach(
-            track => {
+      await handleSignal(
+        message
+      );
 
-                track.onended =
-                    () => {
+    };
 
-                        console.log(
-                            "[RH] Track ended:",
-                            track.kind
-                        );
 
-                    };
+  /* ==========================================================
+     SIGNAL ERROR
+     ========================================================== */
 
-            }
+  state.ws.onerror =
+    () => {
+
+      state.wsReady =
+        false;
+
+
+      setDebug(
+        "debugSignal",
+        "ERROR"
+      );
+
+    };
+
+
+  /* ==========================================================
+     SIGNAL CLOSED
+     ========================================================== */
+
+  state.ws.onclose =
+    () => {
+
+      state.wsReady =
+        false;
+
+
+      setDebug(
+        "debugSignal",
+        "CLOSED"
+      );
+
+
+      if (state.running) {
+
+        setConnection(
+
+          state.peerPresent
+
+            ? "Reconnecting signal…"
+
+            : "Waiting"
+
         );
+
+
+        scheduleReconnect();
+
+      }
+
+    };
 
 }
 
 
 /* ============================================================
-   PATCH CAMERA START
-============================================================ */
+   SIGNAL RECONNECT
+   ============================================================ */
 
-const originalStartCamera =
-    startCamera;
+function scheduleReconnect() {
+
+  clearTimeout(
+    state.reconnectTimer
+  );
 
 
-startCamera =
-    async function () {
+  const delay =
+    Math.min(
 
-        await originalStartCamera();
+      10000,
 
-        monitorLocalTracks();
+      1000 *
+      Math.pow(
+        2,
+        state.reconnectAttempt
+      )
+
+    );
+
+
+  state.reconnectAttempt++;
+
+
+  state.reconnectTimer =
+    setTimeout(
+
+      connectSignal,
+
+      delay
+
+    );
+
+}
+
+
+/* ============================================================
+   SEND SIGNAL
+   ============================================================ */
+
+function sendSignal(data) {
+
+  if (
+    state.ws &&
+    state.ws.readyState ===
+      WebSocket.OPEN
+  ) {
+
+    state.ws.send(
+      JSON.stringify(data)
+    );
+
+  }
+
+}
+
+
+/* ============================================================
+   SIGNAL MESSAGE HANDLER
+   ============================================================ */
+
+async function handleSignal(
+  message
+) {
+
+  switch (
+    message.type
+  ) {
+
+
+    /* ========================================================
+       SERVER CONNECTED
+       ======================================================== */
+
+    case "connected":
+
+      state.connectionId =
+        message.connection_id;
+
+
+      updateParticipantCount(
+        message.participants || 1
+      );
+
+
+      break;
+
+
+    /* ========================================================
+       SECOND PERSON ARRIVED
+       ======================================================== */
+
+    case "peer_joined":
+
+      state.peerPresent =
+        true;
+
+
+      state.peerId =
+        message.peer_id;
+
+
+      updateParticipantCount(
+        2
+      );
+
+
+      presenceTitle.textContent =
+        "Your person is here";
+
+
+      presenceText.textContent =
+        "You are sharing the same place now.";
+
+
+      setConnection(
+        "Connecting people…"
+      );
+
+
+      /*
+       * CRITICAL FIX:
+       *
+       * Set offerer BEFORE creating
+       * RTCPeerConnection.
+       */
+
+      state.offerer =
+        true;
+
+
+      await createPeerConnection();
+
+
+      await createOffer();
+
+
+      break;
+
+
+    /* ========================================================
+       RECEIVE OFFER
+       ======================================================== */
+
+    case "offer":
+
+      state.peerId =
+        message.sender_id;
+
+
+      await createPeerConnection();
+
+
+      await state.pc.setRemoteDescription({
+
+        type:
+          "offer",
+
+        sdp:
+          message.sdp
+
+      });
+
+
+      state.remoteDescriptionSet =
+        true;
+
+
+      await flushIce();
+
+
+      const answer =
+        await state.pc.createAnswer();
+
+
+      await state.pc.setLocalDescription(
+        answer
+      );
+
+
+      sendSignal({
+
+        type:
+          "answer",
+
+        sdp:
+          state.pc.localDescription.sdp
+
+      });
+
+
+      break;
+
+
+    /* ========================================================
+       RECEIVE ANSWER
+       ======================================================== */
+
+    case "answer":
+
+      if (!state.pc)
+        return;
+
+
+      await state.pc.setRemoteDescription({
+
+        type:
+          "answer",
+
+        sdp:
+          message.sdp
+
+      });
+
+
+      state.remoteDescriptionSet =
+        true;
+
+
+      await flushIce();
+
+
+      break;
+
+
+    /* ========================================================
+       ICE CANDIDATE
+       ======================================================== */
+
+    case "ice_candidate":
+
+      if (!state.pc)
+        return;
+
+
+      if (
+        state.remoteDescriptionSet
+      ) {
+
+        try {
+
+          await state.pc.addIceCandidate(
+            message.candidate
+          );
+
+        }
+
+        catch (error) {
+
+          console.warn(
+            "ICE candidate error",
+            error
+          );
+
+        }
+
+      }
+
+      else {
+
+        state.pendingIce.push(
+          message.candidate
+        );
+
+      }
+
+
+      break;
+
+
+    /* ========================================================
+       PEER LEFT
+       ======================================================== */
+
+    case "peer_left":
+
+      peerLeft();
+
+      break;
+
+
+    /* ========================================================
+       SERVER ERROR
+       ======================================================== */
+
+    case "error":
+
+      toastMsg(
+        message.message ||
+        "Signaling error."
+      );
+
+      break;
+
+  }
+
+}
+
+
+/* ============================================================
+   CREATE WEBRTC CONNECTION
+   ============================================================ */
+
+async function createPeerConnection() {
+
+  if (state.pc)
+    return state.pc;
+
+
+  state.pc =
+    new RTCPeerConnection({
+
+      iceServers:
+        RH_CONFIG.ICE_SERVERS
+
+    });
+
+
+  state.remoteDescriptionSet =
+    false;
+
+
+  state.pendingIce =
+    [];
+
+
+  /*
+   * Add real camera + microphone.
+   */
+
+  state.localStream
+    .getTracks()
+    .forEach(track => {
+
+      state.pc.addTrack(
+        track,
+        state.localStream
+      );
+
+    });
+
+
+  /* ==========================================================
+     ICE
+     ========================================================== */
+
+  state.pc.onicecandidate =
+    event => {
+
+      if (
+        event.candidate
+      ) {
+
+        sendSignal({
+
+          type:
+            "ice_candidate",
+
+          candidate:
+            event.candidate
+
+        });
+
+      }
 
     };
 
 
-/* ============================================================
-   START LOOP SAFETY
-============================================================ */
+  /* ==========================================================
+     REMOTE REAL PERSON
+     ========================================================== */
 
-setInterval(
+  state.pc.ontrack =
+    event => {
+
+      state.remoteStream =
+        event.streams[0];
+
+
+      $("remoteVideo").srcObject =
+        state.remoteStream;
+
+
+      $("remoteVideo")
+        .play()
+        .catch(() => {});
+
+
+      /*
+       * Now the real remote human exists.
+       */
+
+      if (
+        state.humanRemote
+      ) {
+
+        state.humanRemote.visible =
+          true;
+
+      }
+
+
+      $("remoteVideo")
+        .addEventListener(
+
+          "loadeddata",
+
+          () => {
+
+            drawRemoteVideo();
+
+
+            if (
+              state.remoteStream
+            ) {
+
+              setupSpatialAudio(
+                state.remoteStream
+              );
+
+            }
+
+          },
+
+          {
+            once:
+              true
+          }
+
+        );
+
+
+      setConnection(
+        "Together",
+        true
+      );
+
+
+      setDebug(
+        "debugRtc",
+        "CONNECTED"
+      );
+
+
+      presenceTitle.textContent =
+        "Together";
+
+
+      presenceText.textContent =
+        "You are both live in the same virtual place.";
+
+    };
+
+
+  /* ==========================================================
+     WEBRTC CONNECTION STATE
+     ========================================================== */
+
+  state.pc.onconnectionstatechange =
     () => {
 
+      const status =
+        state.pc.connectionState;
+
+
+      setDebug(
+        "debugRtc",
+        status.toUpperCase()
+      );
+
+
+      if (
+        status === "connected"
+      ) {
+
+        setConnection(
+          "Together",
+          true
+        );
+
+      }
+
+
+      else if (
+        status === "failed" ||
+        status === "disconnected"
+      ) {
+
+        setConnection(
+          "Connection interrupted"
+        );
+
+      }
+
+    };
+
+
+  /* ==========================================================
+     REMOTE DATA CHANNEL
+     ========================================================== */
+
+  state.pc.ondatachannel =
+    event => {
+
+      state.dataChannel =
+        event.channel;
+
+
+      wireDataChannel();
+
+    };
+
+
+  /* ==========================================================
+     OFFERER DATA CHANNEL
+     ========================================================== */
+
+  if (
+    state.offerer
+  ) {
+
+    state.dataChannel =
+      state.pc.createDataChannel(
+        "presence"
+      );
+
+
+    wireDataChannel();
+
+  }
+
+
+  return state.pc;
+
+}
+
+
+/* ============================================================
+   DATA CHANNEL
+   ============================================================ */
+
+function wireDataChannel() {
+
+  if (!state.dataChannel)
+    return;
+
+
+  state.dataChannel.onopen =
+    () => {
+
+      sendPresence();
+
+
+      setDebug(
+        "debugRtc",
+        "CONNECTED"
+      );
+
+    };
+
+
+  state.dataChannel.onmessage =
+    event => {
+
+      try {
+
+        const message =
+          JSON.parse(
+            event.data
+          );
+
+
         if (
-            state.remoteStream &&
-            dom.remoteVideo.srcObject !==
-            state.remoteStream
+          message.type ===
+          "presence"
         ) {
 
-            dom.remoteVideo.srcObject =
-                state.remoteStream;
+          state.remotePosition.x =
+            Number(
+              message.x
+            ) || 0;
+
+
+          state.remotePosition.z =
+            Number(
+              message.z
+            ) || 0;
+
+
+          drawRemoteVideo();
 
         }
 
-    },
-    1000
-);
+      }
+
+      catch {
+
+        /*
+         * Ignore malformed presence data.
+         */
+
+      }
+
+    };
+
+}
 
 
 /* ============================================================
-   RH READY
-============================================================ */
+   CREATE OFFER
+   ============================================================ */
 
-console.log(
-    "%c RH — REAL HUMAN PRESENCE ",
-    "background:#b8a1ff;color:#080914;font-weight:900;padding:8px;"
-);
+async function createOffer() {
+
+  if (!state.pc)
+    return;
 
 
-console.log(
-    "The place is virtual. The people are real."
-);
+  const offer =
+    await state.pc.createOffer();
+
+
+  await state.pc.setLocalDescription(
+    offer
+  );
+
+
+  sendSignal({
+
+    type:
+      "offer",
+
+    sdp:
+      state.pc.localDescription.sdp
+
+  });
+
+}
+
+
+/* ============================================================
+   FLUSH QUEUED ICE
+   ============================================================ */
+
+async function flushIce() {
+
+  for (
+    const candidate
+    of state.pendingIce
+  ) {
+
+    try {
+
+      await state.pc.addIceCandidate(
+        candidate
+      );
+
+    }
+
+    catch (error) {
+
+      console.warn(
+        "Queued ICE error",
+        error
+      );
+
+    }
+
+  }
+
+
+  state.pendingIce =
+    [];
+
+}
+
+
+/* ============================================================
+   PARTICIPANT COUNT
+   ============================================================ */
+
+function updateParticipantCount(
+  count
+) {
+
+  participantCount.textContent =
+    `${Math.min(
+      count,
+      2
+    )} / 2`;
+
+}
+
+
+/* ============================================================
+   PEER LEFT
+   ============================================================ */
+
+function peerLeft() {
+
+  state.peerPresent =
+    false;
+
+
+  state.peerId =
+    null;
+
+
+  state.offerer =
+    false;
+
+
+  if (state.pc) {
+
+    state.pc.close();
+
+    state.pc =
+      null;
+
+  }
+
+
+  state.dataChannel =
+    null;
+
+
+  state.remoteStream =
+    null;
+
+
+  $("remoteVideo").srcObject =
+    null;
+
+
+  if (
+    state.humanRemote
+  ) {
+
+    state.humanRemote.visible =
+      false;
+
+  }
+
+
+  setConnection(
+    "Waiting"
+  );
+
+
+  setDebug(
+    "debugRtc",
+    "WAITING"
+  );
+
+
+  updateParticipantCount(
+    1
+  );
+
+
+  presenceTitle.textContent =
+    "Waiting for your person";
+
+
+  presenceText.textContent =
+    "Share the room name with someone you love.";
+
+}
+
+
+/* ============================================================
+   SPATIAL AUDIO
+   ============================================================ */
+
+function setupSpatialAudio(
+  stream
+) {
+
+  try {
+
+    if (
+      state.audioContext
+    ) {
+
+      state.audioContext
+        .close()
+        .catch(() => {});
+
+    }
+
+
+    state.audioContext =
+      new AudioContext();
+
+
+    const source =
+      state.audioContext
+        .createMediaStreamSource(
+          stream
+        );
+
+
+    state.audioPanner =
+      state.audioContext
+        .createStereoPanner();
+
+
+    source
+      .connect(
+        state.audioPanner
+      )
+      .connect(
+        state.audioContext.destination
+      );
+
+  }
+
+  catch (error) {
+
+    console.warn(
+      "Spatial audio unavailable",
+      error
+    );
+
+  }
+
+}
+
+
+/* ============================================================
+   MUTE
+   ============================================================ */
+
+function toggleMute() {
+
+  if (!state.localStream)
+    return;
+
+
+  state.muted =
+    !state.muted;
+
+
+  state.localStream
+    .getAudioTracks()
+    .forEach(
+      track => {
+
+        track.enabled =
+          !state.muted;
+
+      }
+    );
+
+
+  $("muteBtn")
+    .classList.toggle(
+      "active",
+      state.muted
+    );
+
+
+  $("muteBtn").innerHTML =
+
+    state.muted
+
+      ? "🔇 <span>Muted</span>"
+
+      : "🎙️ <span>Mute</span>";
+
+}
+
+
+/* ============================================================
+   CAMERA TOGGLE
+   ============================================================ */
+
+function toggleCamera() {
+
+  if (!state.localStream)
+    return;
+
+
+  state.cameraOn =
+    !state.cameraOn;
+
+
+  state.localStream
+    .getVideoTracks()
+    .forEach(
+      track => {
+
+        track.enabled =
+          state.cameraOn;
+
+      }
+    );
+
+
+  $("cameraBtn")
+    .classList.toggle(
+      "active",
+      !state.cameraOn
+    );
+
+
+  $("cameraBtn").innerHTML =
+
+    state.cameraOn
+
+      ? "📷 <span>Camera</span>"
+
+      : "🚫 <span>Camera off</span>";
+
+
+  if (
+    state.humanLocal
+  ) {
+
+    state.humanLocal.visible =
+      state.cameraOn;
+
+  }
+
+}
+
+
+/* ============================================================
+   MEET
+   ============================================================ */
+
+function meet() {
+
+  state.position = {
+
+    x:
+      0,
+
+    z:
+      0
+
+  };
+
+
+  if (
+    state.peerPresent
+  ) {
+
+    state.remotePosition = {
+
+      x:
+        1.2,
+
+      z:
+        -1.2
+
+    };
+
+  }
+
+
+  sendPresence();
+
+}
+
+
+/* ============================================================
+   SHARE ROOM
+   ============================================================ */
+
+async function shareRoom() {
+
+  const link =
+
+    `${location.origin}` +
+    `${location.pathname}` +
+    `?room=${encodeURIComponent(
+      state.roomId
+    )}`;
+
+
+  try {
+
+    await navigator.clipboard.writeText(
+      link
+    );
+
+
+    toastMsg(
+      "Room link copied."
+    );
+
+  }
+
+  catch {
+
+    prompt(
+      "Copy this RH room link:",
+      link
+    );
+
+  }
+
+}
+
+
+/* ============================================================
+   EXIT
+   ============================================================ */
+
+function exitRH() {
+
+  state.running =
+    false;
+
+
+  clearTimeout(
+    state.reconnectTimer
+  );
+
+
+  if (state.ws) {
+
+    state.ws.close();
+
+  }
+
+
+  if (state.pc) {
+
+    state.pc.close();
+
+  }
+
+
+  if (
+    state.localStream
+  ) {
+
+    state.localStream
+      .getTracks()
+      .forEach(
+        track =>
+          track.stop()
+      );
+
+  }
+
+
+  if (
+    state.audioContext
+  ) {
+
+    state.audioContext
+      .close()
+      .catch(() => {});
+
+  }
+
+
+  state.ws =
+    null;
+
+
+  state.pc =
+    null;
+
+
+  state.localStream =
+    null;
+
+
+  state.remoteStream =
+    null;
+
+
+  world.classList.remove(
+    "active"
+  );
+
+
+  lobby.classList.add(
+    "active"
+  );
+
+
+  $("signalCheck").textContent =
+    "● Signal —";
+
+
+  $("mediaCheck").textContent =
+    "● Camera —";
+
+
+  setConnection(
+    "Waiting"
+  );
+
+}
+
+
+/* ============================================================
+   RESIZE
+   ============================================================ */
+
+function resizeWorld() {
+
+  if (
+    !state.camera ||
+    !state.renderer
+  )
+    return;
+
+
+  state.camera.aspect =
+    innerWidth /
+    innerHeight;
+
+
+  state.camera.updateProjectionMatrix();
+
+
+  state.renderer.setSize(
+    innerWidth,
+    innerHeight
+  );
+
+}
+
+
+/* ============================================================
+   UI EVENTS
+   ============================================================ */
+
+$("startBtn")
+  .addEventListener(
+    "click",
+    startRH
+  );
+
+
+roomInput
+  .addEventListener(
+    "keydown",
+    event => {
+
+      if (
+        event.key ===
+        "Enter"
+      ) {
+
+        startRH();
+
+      }
+
+    }
+  );
+
+
+$("muteBtn")
+  .addEventListener(
+    "click",
+    toggleMute
+  );
+
+
+$("cameraBtn")
+  .addEventListener(
+    "click",
+    toggleCamera
+  );
+
+
+$("walkBtn")
+  .addEventListener(
+    "click",
+    () => {
+
+      state.walking =
+        !state.walking;
+
+
+      $("walkBtn")
+        .classList.toggle(
+          "active",
+          state.walking
+        );
+
+    }
+  );
+
+
+$("meetBtn")
+  .addEventListener(
+    "click",
+    meet
+  );
+
+
+$("shareBtn")
+  .addEventListener(
+    "click",
+    shareRoom
+  );
+
+
+$("exitBtn")
+  .addEventListener(
+    "click",
+    exitRH
+  );
+
+
+$("debugToggle")
+  .addEventListener(
+    "click",
+    () => {
+
+      $("debugPanel")
+        .classList.toggle(
+          "visible"
+        );
+
+    }
+  );
+
+
+/* ============================================================
+   ROOM FROM URL
+   ============================================================ */
+
+const urlRoom =
+  new URLSearchParams(
+    location.search
+  ).get(
+    "room"
+  );
+
+
+if (urlRoom) {
+
+  roomInput.value =
+    safeRoom(
+      urlRoom
+    );
+
+}
+
+
+/* ============================================================
+   INITIAL STATUS
+   ============================================================ */
+
+updateSecureStatus();
