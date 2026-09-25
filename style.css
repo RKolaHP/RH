@@ -1,0 +1,938 @@
+/* ============================================================
+   RH — REAL HUMAN PRESENCE
+   FRONTEND STYLES
+============================================================ */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+:root {
+    --bg: #080b16;
+    --panel: #111629;
+    --panel-light: #171d35;
+    --text: #f4f6ff;
+    --muted: #9da6c5;
+    --accent: #9b7cff;
+    --accent-light: #c4b5ff;
+    --cyan: #59d9ff;
+    --green: #50e3a4;
+    --danger: #ff6b81;
+    --border: rgba(255, 255, 255, 0.10);
+}
+
+body {
+    min-height: 100vh;
+
+    font-family:
+        Inter,
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+
+    background:
+        radial-gradient(
+            circle at 50% -10%,
+            rgba(118, 89, 255, 0.25),
+            transparent 40%
+        ),
+        var(--bg);
+
+    color: var(--text);
+}
+
+
+/* ============================================================
+   HEADER
+============================================================ */
+
+.rh-header {
+    height: 82px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    padding: 0 6vw;
+
+    border-bottom: 1px solid var(--border);
+
+    background: rgba(8, 11, 22, 0.85);
+
+    backdrop-filter: blur(18px);
+
+    position: sticky;
+    top: 0;
+
+    z-index: 100;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.brand-mark {
+    width: 46px;
+    height: 46px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 14px;
+
+    background:
+        linear-gradient(
+            135deg,
+            var(--accent),
+            var(--cyan)
+        );
+
+    color: #090b15;
+
+    font-weight: 900;
+    letter-spacing: -1px;
+
+    box-shadow:
+        0 8px 30px rgba(123, 92, 255, 0.35);
+}
+
+.brand-name {
+    font-weight: 750;
+    letter-spacing: -0.3px;
+}
+
+.brand-subtitle {
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 2px;
+}
+
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    font-size: 13px;
+
+    color: var(--muted);
+}
+
+.status-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+}
+
+.status-dot.offline {
+    background: #68708d;
+}
+
+.status-dot.connecting {
+    background: #ffd166;
+}
+
+.status-dot.online {
+    background: var(--green);
+
+    box-shadow:
+        0 0 12px rgba(80, 227, 164, 0.8);
+}
+
+
+/* ============================================================
+   EXPERIENCE
+============================================================ */
+
+.experience {
+    width: min(1250px, 92vw);
+    margin: auto;
+
+    padding: 70px 0;
+}
+
+.hero-copy {
+    max-width: 750px;
+    margin-bottom: 42px;
+}
+
+.eyebrow {
+    display: inline-block;
+
+    font-size: 12px;
+    font-weight: 800;
+
+    letter-spacing: 3px;
+
+    color: var(--cyan);
+
+    margin-bottom: 18px;
+}
+
+.hero-copy h1 {
+    font-size: clamp(42px, 6vw, 76px);
+
+    line-height: 0.98;
+
+    letter-spacing: -4px;
+
+    margin-bottom: 24px;
+}
+
+.hero-copy h1 span {
+    display: block;
+
+    background:
+        linear-gradient(
+            90deg,
+            var(--accent-light),
+            var(--cyan)
+        );
+
+    -webkit-background-clip: text;
+    background-clip: text;
+
+    color: transparent;
+}
+
+.hero-copy p {
+    max-width: 650px;
+
+    color: var(--muted);
+
+    font-size: 18px;
+
+    line-height: 1.7;
+}
+
+
+/* ============================================================
+   WORLD
+============================================================ */
+
+.world {
+    position: relative;
+
+    height: 620px;
+
+    overflow: hidden;
+
+    border-radius: 32px;
+
+    border: 1px solid rgba(255,255,255,0.13);
+
+    background:
+        linear-gradient(
+            180deg,
+            #9ec8f5 0%,
+            #d7efff 45%,
+            #8fd19d 46%,
+            #4d9c69 100%
+        );
+
+    box-shadow:
+        0 30px 100px rgba(0,0,0,0.4);
+
+    isolation: isolate;
+}
+
+
+/* ============================================================
+   SUN
+============================================================ */
+
+.sun {
+    position: absolute;
+
+    width: 110px;
+    height: 110px;
+
+    right: 12%;
+    top: 10%;
+
+    border-radius: 50%;
+
+    background: #fff6c7;
+
+    box-shadow:
+        0 0 80px rgba(255, 239, 157, 0.9);
+}
+
+
+/* ============================================================
+   CLOUDS
+============================================================ */
+
+.cloud {
+    position: absolute;
+
+    width: 150px;
+    height: 42px;
+
+    border-radius: 50px;
+
+    background: rgba(255,255,255,0.72);
+
+    filter: blur(1px);
+}
+
+.cloud::before,
+.cloud::after {
+    content: "";
+
+    position: absolute;
+
+    border-radius: 50%;
+
+    background: inherit;
+}
+
+.cloud::before {
+    width: 70px;
+    height: 70px;
+
+    left: 28px;
+    bottom: 0;
+}
+
+.cloud::after {
+    width: 85px;
+    height: 85px;
+
+    left: 72px;
+    bottom: 0;
+}
+
+.cloud-one {
+    left: 12%;
+    top: 14%;
+}
+
+.cloud-two {
+    left: 52%;
+    top: 23%;
+
+    transform: scale(0.7);
+}
+
+
+/* ============================================================
+   MOUNTAINS
+============================================================ */
+
+.mountain {
+    position: absolute;
+
+    bottom: 34%;
+
+    width: 0;
+    height: 0;
+
+    border-left: 190px solid transparent;
+    border-right: 190px solid transparent;
+    border-bottom: 260px solid rgba(73, 113, 129, 0.55);
+}
+
+.mountain-one {
+    left: -30px;
+}
+
+.mountain-two {
+    right: 70px;
+
+    transform: scale(0.75);
+}
+
+
+/* ============================================================
+   PATH
+============================================================ */
+
+.path {
+    position: absolute;
+
+    left: 50%;
+    bottom: -10%;
+
+    width: 290px;
+    height: 75%;
+
+    transform:
+        translateX(-50%)
+        perspective(300px)
+        rotateX(20deg);
+
+    background:
+        linear-gradient(
+            90deg,
+            rgba(222,191,150,0.7),
+            rgba(241,216,177,0.9),
+            rgba(222,191,150,0.7)
+        );
+
+    clip-path:
+        polygon(
+            43% 0,
+            57% 0,
+            100% 100%,
+            0 100%
+        );
+
+    z-index: 2;
+}
+
+
+/* ============================================================
+   TREES
+============================================================ */
+
+.tree {
+    position: absolute;
+
+    bottom: 30%;
+
+    z-index: 4;
+}
+
+.tree-one {
+    left: 7%;
+}
+
+.tree-two {
+    right: 8%;
+
+    transform: scale(0.75);
+}
+
+.tree-top {
+    width: 100px;
+    height: 100px;
+
+    border-radius: 50%;
+
+    background:
+        radial-gradient(
+            circle at 30% 25%,
+            #72c48a,
+            #29714a
+        );
+
+    box-shadow:
+        20px 25px 0 #347d51,
+        -20px 30px 0 #3f8d5b;
+}
+
+.tree-trunk {
+    width: 28px;
+    height: 100px;
+
+    margin: -12px auto 0;
+
+    background: #70513c;
+
+    border-radius: 8px;
+}
+
+
+/* ============================================================
+   VIDEO CARDS
+============================================================ */
+
+.person-card {
+    position: absolute;
+
+    width: 260px;
+
+    border-radius: 22px;
+
+    overflow: hidden;
+
+    background: rgba(8, 11, 22, 0.82);
+
+    border: 1px solid rgba(255,255,255,0.2);
+
+    backdrop-filter: blur(14px);
+
+    box-shadow:
+        0 20px 50px rgba(0,0,0,0.3);
+
+    z-index: 10;
+}
+
+.local-card {
+    left: 5%;
+    bottom: 5%;
+}
+
+.remote-card {
+    right: 5%;
+    bottom: 5%;
+}
+
+.video-container {
+    height: 170px;
+
+    position: relative;
+
+    background: #151a2d;
+
+    overflow: hidden;
+}
+
+video {
+    width: 100%;
+    height: 100%;
+
+    display: block;
+
+    object-fit: cover;
+
+    background: #111;
+}
+
+#localVideo {
+    transform: scaleX(-1);
+}
+
+.video-placeholder {
+    position: absolute;
+
+    inset: 0;
+
+    display: flex;
+    flex-direction: column;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 10px;
+
+    color: var(--muted);
+
+    background:
+        radial-gradient(
+            circle,
+            rgba(155,124,255,0.15),
+            transparent 65%
+        );
+}
+
+.placeholder-icon {
+    width: 52px;
+    height: 52px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 50%;
+
+    border: 1px solid rgba(255,255,255,0.18);
+
+    color: var(--accent-light);
+
+    font-size: 24px;
+}
+
+.person-info {
+    height: 68px;
+
+    padding: 12px 15px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+}
+
+.person-info strong {
+    display: block;
+
+    font-size: 14px;
+}
+
+.person-info span:not(.live-indicator) {
+    display: block;
+
+    margin-top: 4px;
+
+    color: var(--muted);
+
+    font-size: 11px;
+}
+
+.live-indicator {
+    font-size: 9px;
+
+    font-weight: 800;
+
+    letter-spacing: 1px;
+
+    color: var(--green);
+}
+
+.hidden {
+    display: none;
+}
+
+
+/* ============================================================
+   CONTROL PANEL
+============================================================ */
+
+.control-panel {
+    margin-top: 28px;
+
+    padding: 26px;
+
+    border-radius: 24px;
+
+    background: rgba(17,22,41,0.88);
+
+    border: 1px solid var(--border);
+
+    display: flex;
+
+    align-items: flex-end;
+    justify-content: space-between;
+
+    gap: 25px;
+}
+
+.room-section {
+    flex: 1;
+
+    max-width: 430px;
+}
+
+.room-section label {
+    display: block;
+
+    margin-bottom: 9px;
+
+    font-size: 11px;
+
+    letter-spacing: 2px;
+
+    color: var(--muted);
+
+    font-weight: 800;
+}
+
+.room-input-row {
+    display: flex;
+
+    gap: 10px;
+}
+
+.room-input-row input {
+    min-width: 0;
+    flex: 1;
+
+    height: 48px;
+
+    padding: 0 15px;
+
+    border-radius: 12px;
+
+    border: 1px solid var(--border);
+
+    background: #0b0f1d;
+
+    color: white;
+
+    outline: none;
+
+    font-weight: 650;
+}
+
+.room-input-row input:focus {
+    border-color: var(--accent);
+}
+
+.room-help {
+    color: var(--muted);
+
+    font-size: 11px;
+
+    margin-top: 9px;
+
+    line-height: 1.5;
+}
+
+
+/* ============================================================
+   BUTTONS
+============================================================ */
+
+.controls {
+    display: flex;
+
+    gap: 9px;
+
+    flex-wrap: wrap;
+
+    justify-content: flex-end;
+}
+
+button {
+    border: none;
+
+    font: inherit;
+
+    cursor: pointer;
+}
+
+.primary-button,
+.control-button {
+    height: 48px;
+
+    padding: 0 16px;
+
+    border-radius: 12px;
+
+    background: var(--panel-light);
+
+    color: white;
+
+    border: 1px solid var(--border);
+
+    transition:
+        transform 0.2s ease,
+        border-color 0.2s ease,
+        background 0.2s ease;
+}
+
+.primary-button {
+    background:
+        linear-gradient(
+            135deg,
+            #8062f5,
+            #4fbedc
+        );
+
+    border: none;
+
+    font-weight: 750;
+}
+
+.control-button {
+    display: flex;
+
+    align-items: center;
+
+    gap: 8px;
+}
+
+button:hover:not(:disabled) {
+    transform: translateY(-2px);
+
+    border-color: rgba(255,255,255,0.25);
+}
+
+button:disabled {
+    opacity: 0.38;
+
+    cursor: not-allowed;
+}
+
+.control-button.danger {
+    color: var(--danger);
+}
+
+
+/* ============================================================
+   DEBUG PANEL
+============================================================ */
+
+.debug-panel {
+    margin-top: 18px;
+
+    border: 1px solid var(--border);
+
+    border-radius: 18px;
+
+    overflow: hidden;
+
+    background: rgba(9,12,24,0.8);
+}
+
+.debug-header {
+    padding: 12px 16px;
+
+    display: flex;
+
+    justify-content: space-between;
+
+    color: var(--muted);
+
+    font-size: 10px;
+
+    letter-spacing: 1.5px;
+
+    border-bottom: 1px solid var(--border);
+}
+
+.connection-log {
+    height: 110px;
+
+    overflow-y: auto;
+
+    padding: 12px 16px;
+
+    font-family:
+        ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        monospace;
+
+    font-size: 11px;
+}
+
+.log-line {
+    display: flex;
+
+    gap: 12px;
+
+    margin-bottom: 8px;
+
+    color: #b7bfdc;
+}
+
+.log-time {
+    color: var(--cyan);
+
+    min-width: 55px;
+}
+
+
+/* ============================================================
+   FOOTER
+============================================================ */
+
+.rh-footer {
+    width: min(1250px, 92vw);
+
+    margin: 0 auto 50px;
+
+    padding-top: 25px;
+
+    border-top: 1px solid var(--border);
+
+    display: flex;
+
+    justify-content: space-between;
+
+    gap: 20px;
+
+    color: var(--muted);
+
+    font-size: 12px;
+}
+
+.rh-footer strong {
+    color: var(--text);
+}
+
+
+/* ============================================================
+   MOBILE
+============================================================ */
+
+@media (max-width: 850px) {
+
+    .rh-header {
+        padding: 0 4vw;
+    }
+
+    .experience {
+        padding-top: 45px;
+    }
+
+    .hero-copy h1 {
+        letter-spacing: -2px;
+    }
+
+    .world {
+        height: 700px;
+    }
+
+    .person-card {
+        width: 42%;
+
+        min-width: 190px;
+    }
+
+    .control-panel {
+        flex-direction: column;
+
+        align-items: stretch;
+    }
+
+    .room-section {
+        max-width: none;
+    }
+
+    .controls {
+        justify-content: flex-start;
+    }
+
+    .rh-footer {
+        flex-direction: column;
+    }
+}
+
+
+@media (max-width: 560px) {
+
+    .brand-subtitle {
+        display: none;
+    }
+
+    .connection-status {
+        font-size: 11px;
+    }
+
+    .world {
+        height: 720px;
+    }
+
+    .local-card {
+        left: 4%;
+        bottom: 4%;
+    }
+
+    .remote-card {
+        right: 4%;
+        bottom: 4%;
+    }
+
+    .person-card {
+        width: 46%;
+    }
+
+    .video-container {
+        height: 130px;
+    }
+
+    .room-input-row {
+        flex-direction: column;
+    }
+
+    .controls {
+        display: grid;
+
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .control-button {
+        justify-content: center;
+    }
+}
