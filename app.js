@@ -1,11 +1,11 @@
 /* ============================================================
    RH — REAL HUMAN PRESENCE
-   WebRTC FRONTEND
+   WebRTC + shared place + live movement
 ============================================================ */
 
 
 /* ============================================================
-   RH CONFIGURATION
+   CONFIGURATION
 ============================================================ */
 
 const RH_CONFIG = {
@@ -17,13 +17,114 @@ const RH_CONFIG = {
         "wss://runic-kamdyn-dispersedly.ngrok-free.dev/ws",
 
     defaultRoom:
-        "RH-DEMO"
+        "RH-DEMO",
+
+    iceServers: [
+        {
+            urls: "stun:stun.l.google.com:19302"
+        },
+        {
+            urls: "stun:stun1.l.google.com:19302"
+        }
+    ]
 };
 
 
 /* ============================================================
-   DOM ELEMENTS
+   PLACE DEFINITIONS
 ============================================================ */
+
+const PLACES = {
+
+    park: {
+        name: "Park",
+        worldName: "PARK",
+        description:
+            "A quiet place to walk together."
+    },
+
+    devotional: {
+        name: "Peace",
+        worldName: "PEACE",
+        description:
+            "A quiet shared place for reflection."
+    },
+
+    shopping: {
+        name: "Shopping",
+        worldName: "SHOPPING",
+        description:
+            "Walk through the stores together."
+    },
+
+    school: {
+        name: "School",
+        worldName: "SCHOOL",
+        description:
+            "Be there for the everyday moments."
+    },
+
+    home: {
+        name: "Home",
+        worldName: "HOME",
+        description:
+            "Sit together, even from different places."
+    },
+
+    meet: {
+        name: "Meet",
+        worldName: "MEET",
+        description:
+            "Meet somewhere in the middle."
+    }
+};
+
+
+/* ============================================================
+   DOM
+============================================================ */
+
+const welcomeScreen =
+    document.getElementById("welcomeScreen");
+
+const setupScreen =
+    document.getElementById("setupScreen");
+
+const rhWorld =
+    document.getElementById("rhWorld");
+
+const setupPlaceName =
+    document.getElementById("setupPlaceName");
+
+const setupPlaceDescription =
+    document.getElementById("setupPlaceDescription");
+
+const setupPreviewScene =
+    document.getElementById("setupPreviewScene");
+
+const roomInput =
+    document.getElementById("roomInput");
+
+const setupStatus =
+    document.getElementById("setupStatus");
+
+const enterRhBtn =
+    document.getElementById("enterRhBtn");
+
+const backToPlaces =
+    document.getElementById("backToPlaces");
+
+const worldPlace =
+    document.getElementById("worldPlace");
+
+const activeRoom =
+    document.getElementById("activeRoom");
+
+const connectionDot =
+    document.getElementById("connectionDot");
+
+const connectionText =
+    document.getElementById("connectionText");
 
 const localVideo =
     document.getElementById("localVideo");
@@ -31,208 +132,324 @@ const localVideo =
 const remoteVideo =
     document.getElementById("remoteVideo");
 
-const localPlaceholder =
-    document.getElementById("localPlaceholder");
+const localPresence =
+    document.getElementById("localPresence");
 
-const remotePlaceholder =
-    document.getElementById("remotePlaceholder");
+const remotePresence =
+    document.getElementById("remotePresence");
 
-const remoteMessage =
-    document.getElementById("remoteMessage");
+const waitingState =
+    document.getElementById("waitingState");
 
-const localState =
-    document.getElementById("localState");
+const walkMessage =
+    document.getElementById("walkMessage");
 
-const remoteState =
-    document.getElementById("remoteState");
+const consolePanel =
+    document.getElementById("consolePanel");
 
-const remoteLive =
-    document.getElementById("remoteLive");
+const consoleOutput =
+    document.getElementById("consoleOutput");
 
-const statusDot =
-    document.getElementById("statusDot");
+const consoleToggle =
+    document.getElementById("consoleToggle");
 
-const statusText =
-    document.getElementById("statusText");
+const consoleClose =
+    document.getElementById("consoleClose");
 
-const roomInput =
-    document.getElementById("roomInput");
+const muteBtn =
+    document.getElementById("muteBtn");
 
-const roomDisplay =
-    document.getElementById("roomDisplay");
+const cameraBtn =
+    document.getElementById("cameraBtn");
 
-const connectionLog =
-    document.getElementById("connectionLog");
+const walkBtn =
+    document.getElementById("walkBtn");
 
-const cameraButton =
-    document.getElementById("cameraButton");
+const recenterBtn =
+    document.getElementById("recenterBtn");
 
-const muteButton =
-    document.getElementById("muteButton");
+const exitRhBtn =
+    document.getElementById("exitRhBtn");
 
-const connectButton =
-    document.getElementById("connectButton");
-
-const joinButton =
-    document.getElementById("joinButton");
-
-const leaveButton =
-    document.getElementById("leaveButton");
+const copyRoomBtn =
+    document.getElementById("copyRoomBtn");
 
 
 /* ============================================================
-   APPLICATION STATE
+   STATE
 ============================================================ */
 
-let localStream = null;
-
-let peerConnection = null;
-
-let websocket = null;
+let selectedPlace = "park";
 
 let roomId =
     RH_CONFIG.defaultRoom;
 
+let localStream = null;
+
+let remoteStream = null;
+
+let socket = null;
+
+let peerConnection = null;
+
+let dataChannel = null;
+
 let connectionId = null;
 
-let peerId = null;
+let remotePeerId = null;
+
+let isOfferer = false;
 
 let isMuted = false;
 
-let isLeaving = false;
+let cameraEnabled = true;
+
+let walkMode = true;
+
+let socketConnected = false;
+
+let peerConnected = false;
 
 
 /* ============================================================
-   WEBRTC CONFIGURATION
+   PRESENCE POSITION
 ============================================================ */
 
-const peerConfiguration = {
+const localPosition = {
 
-    iceServers: [
-
-        {
-            urls: [
-                "stun:stun.l.google.com:19302"
-            ]
-        }
-
-    ]
+    x: 35,
+    y: 67,
+    z: 0.5
 };
+
+const remotePosition = {
+
+    x: 65,
+    y: 67,
+    z: 0.5
+};
+
+
+/* ============================================================
+   PLACE SELECTION
+============================================================ */
+
+document
+    .querySelectorAll(".place-card")
+    .forEach(card => {
+
+        card.addEventListener("click", () => {
+
+            selectedPlace =
+                card.dataset.place;
+
+            showSetupScreen();
+        });
+    });
+
+
+function showSetupScreen() {
+
+    const place =
+        PLACES[selectedPlace];
+
+    setupPlaceName.textContent =
+        place.name;
+
+    setupPlaceDescription.textContent =
+        place.description;
+
+    setupPreviewScene.className =
+        `preview-scene ${selectedPlace}`;
+
+    welcomeScreen.classList.remove("active");
+
+    setupScreen.classList.add("active");
+
+    setTimeout(() => {
+        roomInput.focus();
+    }, 400);
+}
+
+
+/* ============================================================
+   BACK
+============================================================ */
+
+backToPlaces.addEventListener("click", () => {
+
+    setupScreen.classList.remove("active");
+
+    welcomeScreen.classList.add("active");
+
+});
+
+
+/* ============================================================
+   MORE PLACES
+============================================================ */
+
+document
+    .getElementById("morePlacesBtn")
+    .addEventListener("click", () => {
+
+        alert(
+            "RH is designed to expand into more shared places — beaches, campuses, restaurants, neighborhoods, travel destinations, family homes and custom places."
+        );
+
+    });
 
 
 /* ============================================================
    LOGGING
 ============================================================ */
 
-function log(message) {
+function log(message, type = "") {
 
     const line =
         document.createElement("div");
 
     line.className =
-        "log-line";
+        `console-line ${type}`;
 
     const time =
-        document.createElement("span");
+        new Date().toLocaleTimeString();
 
-    time.className =
-        "log-time";
+    line.textContent =
+        `[${time}] ${message}`;
 
-    const now =
-        new Date();
+    consoleOutput.appendChild(line);
 
-    time.textContent =
-        now.toLocaleTimeString();
+    consoleOutput.scrollTop =
+        consoleOutput.scrollHeight;
 
-    const text =
-        document.createElement("span");
-
-    text.textContent =
-        message;
-
-    line.appendChild(time);
-    line.appendChild(text);
-
-    connectionLog.appendChild(line);
-
-    connectionLog.scrollTop =
-        connectionLog.scrollHeight;
-
-    console.log("[RH]", message);
+    console.log(`[RH] ${message}`);
 }
 
 
 /* ============================================================
-   STATUS
+   CONNECTION UI
 ============================================================ */
 
-function setStatus(
+function setConnectionState(
     state,
     message
 ) {
 
-    statusDot.className =
-        "status-dot " + state;
-
-    statusText.textContent =
+    connectionText.textContent =
         message;
+
+    connectionDot.classList.toggle(
+        "connected",
+        state === "connected"
+    );
+
+    if (state === "connected") {
+
+        rhWorld.classList.add("connected");
+
+    } else {
+
+        rhWorld.classList.remove("connected");
+    }
 }
 
 
 /* ============================================================
-   INITIALIZE
+   ENTER RH
 ============================================================ */
 
-roomInput.value =
-    RH_CONFIG.defaultRoom;
-
-roomDisplay.textContent =
-    `Room: ${RH_CONFIG.defaultRoom}`;
-
-log(
-    "Frontend configuration loaded."
+enterRhBtn.addEventListener(
+    "click",
+    enterRh
 );
 
-log(
-    `Signaling: ${RH_CONFIG.signalingServer}`
+
+roomInput.addEventListener(
+    "keydown",
+    event => {
+
+        if (event.key === "Enter") {
+            enterRh();
+        }
+
+    }
 );
+
+
+async function enterRh() {
+
+    roomId =
+        roomInput.value
+            .trim()
+            .toUpperCase();
+
+    if (!roomId) {
+
+        setupStatus.textContent =
+            "Please enter a room name.";
+
+        return;
+    }
+
+    setupStatus.textContent =
+        "Requesting camera and microphone…";
+
+    enterRhBtn.disabled = true;
+
+    try {
+
+        await startLocalMedia();
+
+        setupScreen.classList.remove("active");
+
+        rhWorld.className =
+            `rh-world ${selectedPlace}`;
+
+        rhWorld.classList.add("connected");
+
+        worldPlace.textContent =
+            PLACES[selectedPlace].worldName;
+
+        activeRoom.textContent =
+            roomId;
+
+        await connectSignaling();
+
+    } catch (error) {
+
+        console.error(error);
+
+        setupStatus.textContent =
+            `Could not start RH: ${error.message}`;
+
+        enterRhBtn.disabled = false;
+    }
+}
 
 
 /* ============================================================
-   CAMERA
+   CAMERA + MICROPHONE
 ============================================================ */
 
-async function startCamera() {
+async function startLocalMedia() {
 
     if (localStream) {
-
-        log(
-            "Camera is already running."
-        );
-
         return;
     }
 
     try {
 
-        log(
-            "Requesting camera and microphone..."
-        );
-
         localStream =
             await navigator.mediaDevices.getUserMedia({
-
                 video: {
                     width: {
                         ideal: 1280
                     },
-
                     height: {
                         ideal: 720
                     },
-
-                    facingMode:
-                        "user"
+                    facingMode: "user"
                 },
 
                 audio: {
@@ -240,70 +457,325 @@ async function startCamera() {
                     noiseSuppression: true,
                     autoGainControl: true
                 }
-
             });
 
         localVideo.srcObject =
             localStream;
 
-        localPlaceholder.style.display =
-            "none";
-
-        localState.textContent =
-            "Camera + microphone ready";
-
-        cameraButton.innerHTML =
-            "<span>✓</span><span>Camera Ready</span>";
-
-        muteButton.disabled =
-            false;
-
-        connectButton.disabled =
-            false;
+        await localVideo.play();
 
         log(
-            "Camera and microphone ready."
+            "Camera and microphone ready.",
+            "good"
+        );
+
+        setConnectionState(
+            "waiting",
+            "CONNECTING"
         );
 
     } catch (error) {
 
-        console.error(error);
-
         log(
-            `Camera error: ${error.message}`
+            `Media permission error: ${error.message}`,
+            "warn"
         );
 
-        alert(
-            "RH needs access to your camera and microphone. " +
-            "Please allow browser permissions and try again."
+        throw new Error(
+            "Camera/microphone permission was not granted."
         );
     }
 }
 
 
 /* ============================================================
-   CREATE PEER CONNECTION
+   WEBSOCKET SIGNALING
+============================================================ */
+
+function connectSignaling() {
+
+    return new Promise(
+        (resolve, reject) => {
+
+            const url =
+                `${RH_CONFIG.websocketServer}/${encodeURIComponent(roomId)}`;
+
+            log(
+                `Connecting to ${url}`
+            );
+
+            socket =
+                new WebSocket(url);
+
+            let opened = false;
+
+            socket.onopen = () => {
+
+                opened = true;
+
+                socketConnected = true;
+
+                setConnectionState(
+                    "waiting",
+                    "ROOM CONNECTED"
+                );
+
+                log(
+                    `Joined room ${roomId}.`,
+                    "good"
+                );
+
+                resolve();
+            };
+
+
+            socket.onmessage = async event => {
+
+                try {
+
+                    const message =
+                        JSON.parse(event.data);
+
+                    await handleSignal(message);
+
+                } catch (error) {
+
+                    log(
+                        `Signal handling error: ${error.message}`,
+                        "warn"
+                    );
+                }
+            };
+
+
+            socket.onerror = () => {
+
+                log(
+                    "WebSocket connection error.",
+                    "warn"
+                );
+
+                if (!opened) {
+
+                    reject(
+                        new Error(
+                            "Could not connect to RH signaling server."
+                        )
+                    );
+                }
+            };
+
+
+            socket.onclose = () => {
+
+                socketConnected = false;
+
+                peerConnected = false;
+
+                setConnectionState(
+                    "waiting",
+                    "DISCONNECTED"
+                );
+
+                log(
+                    "Signaling connection closed.",
+                    "warn"
+                );
+            };
+        }
+    );
+}
+
+
+/* ============================================================
+   SIGNAL HANDLER
+============================================================ */
+
+async function handleSignal(message) {
+
+    switch (message.type) {
+
+        case "connected":
+
+            connectionId =
+                message.connection_id;
+
+            log(
+                `You are ${connectionId}.`,
+                "good"
+            );
+
+            if (
+                message.participants >= 2
+            ) {
+
+                log(
+                    "Another participant is already in the room."
+                );
+            }
+
+            break;
+
+
+        case "peer_joined":
+
+            remotePeerId =
+                message.peer_id;
+
+            log(
+                "Another real person joined the place.",
+                "good"
+            );
+
+            waitingState.classList.add(
+                "hidden"
+            );
+
+            createPeerConnection();
+
+            isOfferer = true;
+
+            await createOffer();
+
+            break;
+
+
+        case "offer":
+
+            remotePeerId =
+                message.sender_id;
+
+            log(
+                "Receiving live connection request."
+            );
+
+            if (!peerConnection) {
+                createPeerConnection();
+            }
+
+            isOfferer = false;
+
+            await peerConnection.setRemoteDescription(
+                new RTCSessionDescription(
+                    message.offer
+                )
+            );
+
+            const answer =
+                await peerConnection.createAnswer();
+
+            await peerConnection.setLocalDescription(
+                answer
+            );
+
+            sendSignal({
+                type: "answer",
+                answer: peerConnection.localDescription
+            });
+
+            log(
+                "Answer sent.",
+                "good"
+            );
+
+            break;
+
+
+        case "answer":
+
+            if (!peerConnection) {
+                return;
+            }
+
+            await peerConnection.setRemoteDescription(
+                new RTCSessionDescription(
+                    message.answer
+                )
+            );
+
+            log(
+                "Connection answer accepted.",
+                "good"
+            );
+
+            break;
+
+
+        case "ice-candidate":
+
+            if (
+                peerConnection &&
+                message.candidate
+            ) {
+
+                try {
+
+                    await peerConnection.addIceCandidate(
+                        new RTCIceCandidate(
+                            message.candidate
+                        )
+                    );
+
+                } catch (error) {
+
+                    log(
+                        `ICE candidate error: ${error.message}`,
+                        "warn"
+                    );
+                }
+            }
+
+            break;
+
+
+        case "peer_left":
+
+            log(
+                "The other person left the place.",
+                "warn"
+            );
+
+            handlePeerLeft();
+
+            break;
+
+
+        case "error":
+
+            log(
+                message.message || "Server error.",
+                "warn"
+            );
+
+            break;
+
+
+        default:
+
+            break;
+    }
+}
+
+
+/* ============================================================
+   PEER CONNECTION
 ============================================================ */
 
 function createPeerConnection() {
 
     if (peerConnection) {
-
         return peerConnection;
     }
 
-    log(
-        "Creating WebRTC peer connection..."
-    );
-
     peerConnection =
-        new RTCPeerConnection(
-            peerConfiguration
-        );
+        new RTCPeerConnection({
+            iceServers:
+                RH_CONFIG.iceServers
+        });
 
 
     /* --------------------------------------------------------
-       Add local media
+       LOCAL MEDIA
     -------------------------------------------------------- */
 
     if (localStream) {
@@ -322,68 +794,83 @@ function createPeerConnection() {
 
 
     /* --------------------------------------------------------
-       Receive remote media
+       REMOTE MEDIA
     -------------------------------------------------------- */
 
     peerConnection.ontrack =
         event => {
 
-            log(
-                "Remote media received."
-            );
+            if (
+                !remoteStream
+            ) {
 
-            const [stream] =
-                event.streams;
+                remoteStream =
+                    new MediaStream();
+            }
 
-            if (!stream) {
-                return;
+            const track =
+                event.track;
+
+            if (
+                !remoteStream
+                    .getTracks()
+                    .some(
+                        t =>
+                            t.id === track.id
+                    )
+            ) {
+
+                remoteStream.addTrack(
+                    track
+                );
             }
 
             remoteVideo.srcObject =
-                stream;
+                remoteStream;
 
-            remotePlaceholder.style.display =
-                "none";
+            remoteVideo.play()
+                .catch(() => {});
 
-            remoteLive.classList.remove(
-                "hidden"
+            remotePresence
+                .classList
+                .remove("hidden");
+
+            waitingState
+                .classList
+                .add("hidden");
+
+            log(
+                "Live video/audio received.",
+                "good"
             );
-
-            remoteState.textContent =
-                "Live connection";
-
         };
 
 
     /* --------------------------------------------------------
-       ICE candidate
+       ICE
     -------------------------------------------------------- */
 
     peerConnection.onicecandidate =
         event => {
 
             if (
-                event.candidate &&
-                websocket &&
-                websocket.readyState ===
-                    WebSocket.OPEN
+                event.candidate
             ) {
 
                 sendSignal({
 
-                    type: "ice_candidate",
+                    type:
+                        "ice-candidate",
 
                     candidate:
                         event.candidate
                 });
-
             }
-
         };
 
 
     /* --------------------------------------------------------
-       Connection state
+       CONNECTION STATE
     -------------------------------------------------------- */
 
     peerConnection.onconnectionstatechange =
@@ -400,56 +887,78 @@ function createPeerConnection() {
                 state === "connected"
             ) {
 
-                setStatus(
-                    "online",
-                    "Real people connected"
+                peerConnected = true;
+
+                setConnectionState(
+                    "connected",
+                    "TOGETHER"
                 );
 
-                remoteState.textContent =
-                    "Live connection";
+                rhWorld.classList.add(
+                    "connected"
+                );
+
+                waitingState
+                    .classList
+                    .add("hidden");
+
+                walkMessage
+                    .classList
+                    .remove("dismissed");
 
             }
+
 
             if (
-                state === "disconnected" ||
-                state === "failed"
+                state === "failed" ||
+                state === "disconnected"
             ) {
 
-                setStatus(
-                    "offline",
-                    "Connection interrupted"
+                peerConnected = false;
+
+                setConnectionState(
+                    "waiting",
+                    "RECONNECTING"
                 );
-
             }
-
-            if (
-                state === "closed"
-            ) {
-
-                setStatus(
-                    "offline",
-                    "Connection closed"
-                );
-
-            }
-
         };
 
 
     /* --------------------------------------------------------
-       ICE state
+       DATA CHANNEL
     -------------------------------------------------------- */
 
-    peerConnection.oniceconnectionstatechange =
-        () => {
+    peerConnection.ondatachannel =
+        event => {
+
+            dataChannel =
+                event.channel;
+
+            configureDataChannel();
 
             log(
-                `ICE state: ${
-                    peerConnection.iceConnectionState
-                }`
+                "Presence movement channel received.",
+                "good"
+            );
+        };
+
+
+    /* --------------------------------------------------------
+       OFFERER CREATES DATA CHANNEL
+    -------------------------------------------------------- */
+
+    if (isOfferer) {
+
+        dataChannel =
+            peerConnection.createDataChannel(
+                "rh-presence",
+                {
+                    ordered: true
+                }
             );
 
-        };
+        configureDataChannel();
+    }
 
 
     return peerConnection;
@@ -457,461 +966,98 @@ function createPeerConnection() {
 
 
 /* ============================================================
-   WEBSOCKET
+   DATA CHANNEL
 ============================================================ */
 
-function connectSignaling() {
+function configureDataChannel() {
 
-    if (
-        websocket &&
-        websocket.readyState ===
-            WebSocket.OPEN
-    ) {
-
-        log(
-            "Already connected to signaling."
-        );
-
+    if (!dataChannel) {
         return;
     }
 
-    const cleanRoom =
-        roomId.trim().toUpperCase();
-
-    if (!cleanRoom) {
-
-        alert(
-            "Please enter an RH room name."
-        );
-
-        return;
-    }
-
-    roomId =
-        cleanRoom;
-
-    roomDisplay.textContent =
-        `Room: ${roomId}`;
-
-    const websocketUrl =
-        `${RH_CONFIG.websocketServer}/${encodeURIComponent(roomId)}`;
-
-    log(
-        `Connecting to RH room ${roomId}...`
-    );
-
-    setStatus(
-        "connecting",
-        "Connecting..."
-    );
-
-    websocket =
-        new WebSocket(websocketUrl);
-
-
-    websocket.onopen =
+    dataChannel.onopen =
         () => {
 
             log(
-                "Signaling connection established."
+                "Shared movement is live.",
+                "good"
             );
 
-            setStatus(
-                "online",
-                "Signaling connected"
-            );
-
-            joinButton.disabled =
-                true;
-
-            roomInput.disabled =
-                true;
-
-            leaveButton.disabled =
-                false;
-
-            if (localStream) {
-
-                connectButton.disabled =
-                    false;
-
-            }
+            sendPresence();
 
         };
 
 
-    websocket.onmessage =
-        async event => {
+    dataChannel.onmessage =
+        event => {
 
             try {
 
-                const message =
+                const data =
                     JSON.parse(event.data);
 
-                await handleSignal(
-                    message
-                );
+                handlePresenceData(data);
 
             } catch (error) {
 
-                console.error(error);
-
-                log(
-                    `Message handling error: ${error.message}`
+                console.warn(
+                    "Presence data error",
+                    error
                 );
-
             }
-
         };
 
 
-    websocket.onerror =
-        error => {
-
-            console.error(
-                "WebSocket error:",
-                error
-            );
-
-            log(
-                "WebSocket signaling error."
-            );
-
-            setStatus(
-                "offline",
-                "Signaling error"
-            );
-
-        };
-
-
-    websocket.onclose =
+    dataChannel.onclose =
         () => {
 
             log(
-                "Signaling connection closed."
+                "Movement channel closed.",
+                "warn"
             );
-
-            setStatus(
-                "offline",
-                "Not connected"
-            );
-
-            joinButton.disabled =
-                false;
-
-            roomInput.disabled =
-                false;
-
-            leaveButton.disabled =
-                true;
-
         };
 }
 
 
 /* ============================================================
-   SIGNAL MESSAGE HANDLER
-============================================================ */
-
-async function handleSignal(
-    message
-) {
-
-    const type =
-        message.type;
-
-
-    /* --------------------------------------------------------
-       Server connected
-    -------------------------------------------------------- */
-
-    if (
-        type === "connected"
-    ) {
-
-        connectionId =
-            message.connection_id;
-
-        log(
-            `Joined room ${message.room_id} as ${connectionId}.`
-        );
-
-        log(
-            `Participants: ${message.participants}`
-        );
-
-        return;
-    }
-
-
-    /* --------------------------------------------------------
-       Another person joined
-    -------------------------------------------------------- */
-
-    if (
-        type === "peer_joined"
-    ) {
-
-        peerId =
-            message.peer_id;
-
-        log(
-            `Another person joined: ${peerId}`
-        );
-
-        remoteMessage.textContent =
-            "Family joined. Connecting...";
-
-        remoteState.textContent =
-            "Family joined";
-
-        /*
-         * The person who was already in the room
-         * creates the WebRTC offer.
-         */
-
-        if (!peerConnection) {
-
-            createPeerConnection();
-
-        }
-
-        await createOffer();
-
-        return;
-    }
-
-
-    /* --------------------------------------------------------
-       WebRTC offer
-    -------------------------------------------------------- */
-
-    if (
-        type === "offer"
-    ) {
-
-        peerId =
-            message.sender_id;
-
-        log(
-            "WebRTC offer received."
-        );
-
-        if (!peerConnection) {
-
-            createPeerConnection();
-
-        }
-
-        await peerConnection.setRemoteDescription(
-            new RTCSessionDescription(
-                message.offer
-            )
-        );
-
-        const answer =
-            await peerConnection.createAnswer();
-
-        await peerConnection.setLocalDescription(
-            answer
-        );
-
-        sendSignal({
-
-            type: "answer",
-
-            answer: answer
-
-        });
-
-        log(
-            "WebRTC answer sent."
-        );
-
-        return;
-    }
-
-
-    /* --------------------------------------------------------
-       WebRTC answer
-    -------------------------------------------------------- */
-
-    if (
-        type === "answer"
-    ) {
-
-        log(
-            "WebRTC answer received."
-        );
-
-        if (!peerConnection) {
-            return;
-        }
-
-        await peerConnection.setRemoteDescription(
-            new RTCSessionDescription(
-                message.answer
-            )
-        );
-
-        log(
-            "Remote description applied."
-        );
-
-        return;
-    }
-
-
-    /* --------------------------------------------------------
-       ICE candidate
-    -------------------------------------------------------- */
-
-    if (
-        type === "ice_candidate"
-    ) {
-
-        if (
-            !peerConnection ||
-            !message.candidate
-        ) {
-
-            return;
-        }
-
-        try {
-
-            await peerConnection.addIceCandidate(
-                new RTCIceCandidate(
-                    message.candidate
-                )
-            );
-
-        } catch (error) {
-
-            console.error(error);
-
-            log(
-                "Could not add ICE candidate."
-            );
-
-        }
-
-        return;
-    }
-
-
-    /* --------------------------------------------------------
-       Peer left
-    -------------------------------------------------------- */
-
-    if (
-        type === "peer_left"
-    ) {
-
-        log(
-            "The other person left the RH room."
-        );
-
-        remoteVideo.srcObject =
-            null;
-
-        remotePlaceholder.style.display =
-            "flex";
-
-        remoteMessage.textContent =
-            "Waiting for family...";
-
-        remoteLive.classList.add(
-            "hidden"
-        );
-
-        remoteState.textContent =
-            "Not connected";
-
-        peerId =
-            null;
-
-        if (peerConnection) {
-
-            peerConnection.close();
-
-            peerConnection =
-                null;
-
-        }
-
-        setStatus(
-            "online",
-            "Waiting for family"
-        );
-
-        return;
-    }
-
-
-    /* --------------------------------------------------------
-       Server error
-    -------------------------------------------------------- */
-
-    if (
-        type === "error"
-    ) {
-
-        log(
-            `Server: ${message.message}`
-        );
-
-        alert(
-            message.message
-        );
-
-        return;
-    }
-
-}
-
-
-/* ============================================================
-   CREATE OFFER
+   OFFER
 ============================================================ */
 
 async function createOffer() {
 
     if (!peerConnection) {
-
         createPeerConnection();
-
     }
 
-    log(
-        "Creating WebRTC offer..."
-    );
+    try {
 
-    const offer =
-        await peerConnection.createOffer({
+        const offer =
+            await peerConnection.createOffer();
 
-            offerToReceiveAudio: true,
+        await peerConnection.setLocalDescription(
+            offer
+        );
 
-            offerToReceiveVideo: true
+        sendSignal({
 
+            type: "offer",
+
+            offer:
+                peerConnection.localDescription
         });
 
-    await peerConnection.setLocalDescription(
-        offer
-    );
+        log(
+            "Live connection offer sent.",
+            "good"
+        );
 
-    sendSignal({
+    } catch (error) {
 
-        type: "offer",
-
-        offer: offer
-
-    });
-
-    log(
-        "WebRTC offer sent."
-    );
+        log(
+            `Offer error: ${error.message}`,
+            "warn"
+        );
+    }
 }
 
 
@@ -919,288 +1065,785 @@ async function createOffer() {
    SEND SIGNAL
 ============================================================ */
 
-function sendSignal(
-    data
-) {
+function sendSignal(message) {
 
     if (
-        !websocket ||
-        websocket.readyState !==
-            WebSocket.OPEN
+        !socket ||
+        socket.readyState !== WebSocket.OPEN
     ) {
 
         log(
-            "Cannot send signal: WebSocket is not connected."
+            "Signaling socket is not open.",
+            "warn"
         );
 
         return;
     }
 
-    websocket.send(
-        JSON.stringify(data)
+    socket.send(
+        JSON.stringify(message)
+    );
+}
+
+
+/* ============================================================
+   PRESENCE MOVEMENT
+============================================================ */
+
+function sendPresence() {
+
+    if (
+        !dataChannel ||
+        dataChannel.readyState !== "open"
+    ) {
+        return;
+    }
+
+    dataChannel.send(
+        JSON.stringify({
+
+            type:
+                "presence_position",
+
+            x:
+                localPosition.x,
+
+            y:
+                localPosition.y,
+
+            z:
+                localPosition.z,
+
+            place:
+                selectedPlace
+        })
+    );
+}
+
+
+function handlePresenceData(data) {
+
+    if (
+        data.type !==
+        "presence_position"
+    ) {
+        return;
+    }
+
+    remotePosition.x =
+        clamp(data.x, 12, 88);
+
+    remotePosition.y =
+        clamp(data.y, 42, 78);
+
+    remotePosition.z =
+        clamp(data.z, 0.1, 1);
+
+    updatePresence(
+        remotePresence,
+        remotePosition
     );
 
+
+    if (
+        data.place &&
+        data.place !== selectedPlace
+    ) {
+
+        /*
+         * Both users should normally choose
+         * the same place before entering.
+         *
+         * This protects the visual experience
+         * if one side sends a place value.
+         */
+
+        log(
+            `Remote presence is in ${data.place}.`
+        );
+    }
 }
+
+
+/* ============================================================
+   UPDATE VISUAL PRESENCE
+============================================================ */
+
+function updatePresence(
+    element,
+    position
+) {
+
+    const scale =
+        0.72 +
+        (
+            (position.y - 42) /
+            (78 - 42)
+        ) * 0.45;
+
+    element.style.setProperty(
+        "--x",
+        `${position.x}%`
+    );
+
+    element.style.setProperty(
+        "--y",
+        `${position.y}%`
+    );
+
+    element.style.setProperty(
+        "--scale",
+        scale.toFixed(3)
+    );
+}
+
+
+/* ============================================================
+   MOVE LOCAL PERSON
+============================================================ */
+
+function moveLocalTo(
+    x,
+    y
+) {
+
+    if (!walkMode) {
+        return;
+    }
+
+    localPosition.x =
+        clamp(x, 12, 88);
+
+    localPosition.y =
+        clamp(y, 43, 78);
+
+    updatePresence(
+        localPresence,
+        localPosition
+    );
+
+    sendPresence();
+
+    walkMessage
+        .classList
+        .add("dismissed");
+}
+
+
+/* ============================================================
+   WORLD CLICK WALKING
+============================================================ */
+
+rhWorld.addEventListener(
+    "click",
+    event => {
+
+        if (
+            event.target.closest(
+                ".control-dock, .world-header, .room-chip, .console-panel, .console-toggle, button"
+            )
+        ) {
+            return;
+        }
+
+        const rect =
+            rhWorld.getBoundingClientRect();
+
+        const x =
+            (
+                (event.clientX -
+                    rect.left) /
+                rect.width
+            ) * 100;
+
+        const y =
+            (
+                (event.clientY -
+                    rect.top) /
+                rect.height
+            ) * 100;
+
+        if (
+            y < 40 ||
+            y > 84
+        ) {
+            return;
+        }
+
+        moveLocalTo(
+            x,
+            y
+        );
+    }
+);
+
+
+/* ============================================================
+   KEYBOARD MOVEMENT
+============================================================ */
+
+document.addEventListener(
+    "keydown",
+    event => {
+
+        if (!walkMode) {
+            return;
+        }
+
+        const active =
+            document.activeElement;
+
+        if (
+            active &&
+            (
+                active.tagName === "INPUT" ||
+                active.tagName === "TEXTAREA"
+            )
+        ) {
+            return;
+        }
+
+        const key =
+            event.key.toLowerCase();
+
+        const step = 2.2;
+
+        let moved = false;
+
+
+        if (
+            key === "arrowleft" ||
+            key === "a"
+        ) {
+
+            localPosition.x -= step;
+
+            moved = true;
+        }
+
+
+        if (
+            key === "arrowright" ||
+            key === "d"
+        ) {
+
+            localPosition.x += step;
+
+            moved = true;
+        }
+
+
+        if (
+            key === "arrowup" ||
+            key === "w"
+        ) {
+
+            localPosition.y -= step;
+
+            moved = true;
+        }
+
+
+        if (
+            key === "arrowdown" ||
+            key === "s"
+        ) {
+
+            localPosition.y += step;
+
+            moved = true;
+        }
+
+
+        if (moved) {
+
+            event.preventDefault();
+
+            localPosition.x =
+                clamp(
+                    localPosition.x,
+                    12,
+                    88
+                );
+
+            localPosition.y =
+                clamp(
+                    localPosition.y,
+                    43,
+                    78
+                );
+
+            updatePresence(
+                localPresence,
+                localPosition
+            );
+
+            sendPresence();
+
+            walkMessage
+                .classList
+                .add("dismissed");
+        }
+
+    }
+);
+
+
+/* ============================================================
+   RECENTER / MEET
+============================================================ */
+
+recenterBtn.addEventListener(
+    "click",
+    () => {
+
+        moveLocalTo(
+            50,
+            62
+        );
+
+        if (
+            peerConnected &&
+            remotePresence &&
+            !remotePresence.classList.contains("hidden")
+        ) {
+
+            /*
+             * We don't force the other person's position.
+             * We simply move ourselves toward the
+             * shared meeting point.
+             */
+
+            log(
+                "Moving toward the shared meeting point.",
+                "good"
+            );
+        }
+    }
+);
+
+
+/* ============================================================
+   WALK MODE
+============================================================ */
+
+walkBtn.addEventListener(
+    "click",
+    () => {
+
+        walkMode =
+            !walkMode;
+
+        walkBtn.classList.toggle(
+            "active-control",
+            walkMode
+        );
+
+        if (walkMode) {
+
+            walkMessage
+                .classList
+                .remove("dismissed");
+
+            log(
+                "Walk mode enabled.",
+                "good"
+            );
+
+        } else {
+
+            walkMessage
+                .classList
+                .add("dismissed");
+
+            log(
+                "Walk mode paused."
+            );
+        }
+    }
+);
 
 
 /* ============================================================
    MUTE
 ============================================================ */
 
-function toggleMute() {
+muteBtn.addEventListener(
+    "click",
+    () => {
 
-    if (!localStream) {
-        return;
-    }
-
-    const audioTracks =
-        localStream.getAudioTracks();
-
-    if (
-        audioTracks.length === 0
-    ) {
-
-        return;
-    }
-
-    isMuted =
-        !isMuted;
-
-    audioTracks.forEach(
-        track => {
-            track.enabled =
-                !isMuted;
+        if (!localStream) {
+            return;
         }
-    );
 
-    if (isMuted) {
+        isMuted =
+            !isMuted;
 
-        muteButton.innerHTML =
-            "<span>🔇</span><span>Unmute</span>";
+        localStream
+            .getAudioTracks()
+            .forEach(
+                track => {
+                    track.enabled =
+                        !isMuted;
+                }
+            );
 
-        localState.textContent =
-            "Microphone muted";
-
-        log(
-            "Microphone muted."
+        muteBtn.classList.toggle(
+            "active-control",
+            isMuted
         );
 
-    } else {
+        muteBtn.querySelector(
+            ".control-text"
+        ).textContent =
+            isMuted
+                ? "Unmute"
+                : "Mute";
 
-        muteButton.innerHTML =
-            "<span>🎙️</span><span>Mute</span>";
-
-        localState.textContent =
-            "Camera + microphone ready";
+        muteBtn.querySelector(
+            ".control-icon"
+        ).textContent =
+            isMuted
+                ? "🔇"
+                : "🎙";
 
         log(
-            "Microphone unmuted."
+            isMuted
+                ? "Microphone muted."
+                : "Microphone unmuted."
         );
-
     }
-
-}
+);
 
 
 /* ============================================================
-   LEAVE ROOM
+   CAMERA
 ============================================================ */
 
-function leaveRoom() {
+cameraBtn.addEventListener(
+    "click",
+    () => {
 
-    if (isLeaving) {
-        return;
+        if (!localStream) {
+            return;
+        }
+
+        cameraEnabled =
+            !cameraEnabled;
+
+        localStream
+            .getVideoTracks()
+            .forEach(
+                track => {
+                    track.enabled =
+                        cameraEnabled;
+                }
+            );
+
+        cameraBtn.classList.toggle(
+            "active-control",
+            cameraEnabled
+        );
+
+        cameraBtn.querySelector(
+            ".control-text"
+        ).textContent =
+            cameraEnabled
+                ? "Camera"
+                : "Off";
+
+        cameraBtn.querySelector(
+            ".control-icon"
+        ).textContent =
+            cameraEnabled
+                ? "◉"
+                : "○";
+
+        log(
+            cameraEnabled
+                ? "Camera enabled."
+                : "Camera disabled."
+        );
     }
+);
 
-    isLeaving =
-        true;
 
-    log(
-        "Leaving RH room..."
-    );
+/* ============================================================
+   COPY ROOM
+============================================================ */
 
+copyRoomBtn.addEventListener(
+    "click",
+    async () => {
+
+        try {
+
+            await navigator.clipboard.writeText(
+                roomId
+            );
+
+            copyRoomBtn.textContent =
+                "✓";
+
+            setTimeout(() => {
+
+                copyRoomBtn.textContent =
+                    "⧉";
+
+            }, 1200);
+
+            log(
+                `Room ${roomId} copied.`,
+                "good"
+            );
+
+        } catch {
+
+            log(
+                "Could not copy room name.",
+                "warn"
+            );
+        }
+    }
+);
+
+
+/* ============================================================
+   CONSOLE
+============================================================ */
+
+consoleToggle.addEventListener(
+    "click",
+    () => {
+
+        consolePanel.classList.remove(
+            "hidden"
+        );
+
+        consoleToggle.classList.add(
+            "hidden"
+        );
+    }
+);
+
+
+consoleClose.addEventListener(
+    "click",
+    () => {
+
+        consolePanel.classList.add(
+            "hidden"
+        );
+
+        consoleToggle.classList.remove(
+            "hidden"
+        );
+    }
+);
+
+
+/* ============================================================
+   EXIT
+============================================================ */
+
+exitRhBtn.addEventListener(
+    "click",
+    exitRh
+);
+
+
+function exitRh() {
+
+    if (dataChannel) {
+
+        try {
+            dataChannel.close();
+        } catch {}
+    }
 
     if (peerConnection) {
 
-        peerConnection.close();
-
-        peerConnection =
-            null;
-
+        try {
+            peerConnection.close();
+        } catch {}
     }
 
+    if (socket) {
 
-    if (websocket) {
-
-        websocket.close();
-
-        websocket =
-            null;
-
+        try {
+            socket.close();
+        } catch {}
     }
 
+    if (localStream) {
 
-    peerId =
-        null;
+        localStream
+            .getTracks()
+            .forEach(
+                track =>
+                    track.stop()
+            );
+    }
 
-    connectionId =
+    localStream = null;
+
+    remoteStream = null;
+
+    socket = null;
+
+    peerConnection = null;
+
+    dataChannel = null;
+
+    connectionId = null;
+
+    remotePeerId = null;
+
+    peerConnected = false;
+
+    socketConnected = false;
+
+    localVideo.srcObject =
         null;
 
     remoteVideo.srcObject =
         null;
 
-    remotePlaceholder.style.display =
-        "flex";
+    remotePresence
+        .classList
+        .add("hidden");
 
-    remoteMessage.textContent =
-        "Waiting for family...";
+    waitingState
+        .classList
+        .remove("hidden");
 
-    remoteLive.classList.add(
-        "hidden"
+    setConnectionState(
+        "waiting",
+        "NOT CONNECTED"
     );
 
-    remoteState.textContent =
-        "Not connected";
-
-    setStatus(
-        "offline",
-        "Not connected"
+    rhWorld.classList.remove(
+        "connected"
     );
 
-    joinButton.disabled =
-        false;
+    setupScreen.classList.remove(
+        "active"
+    );
 
-    roomInput.disabled =
-        false;
+    welcomeScreen.classList.add(
+        "active"
+    );
 
-    leaveButton.disabled =
-        true;
+    enterRhBtn.disabled = false;
 
-    isLeaving =
-        false;
+    setupStatus.textContent =
+        "Camera and microphone will be requested by your browser.";
 
+    log(
+        "Exited RH."
+    );
 }
 
 
 /* ============================================================
-   BUTTON EVENTS
+   PEER LEFT
 ============================================================ */
 
-cameraButton.addEventListener(
-    "click",
-    startCamera
-);
+function handlePeerLeft() {
 
-muteButton.addEventListener(
-    "click",
-    toggleMute
-);
+    remotePresence
+        .classList
+        .add("hidden");
 
-joinButton.addEventListener(
-    "click",
-    () => {
+    waitingState
+        .classList
+        .remove("hidden");
 
-        roomId =
-            roomInput.value
-                .trim()
-                .toUpperCase();
+    peerConnected = false;
 
-        if (!roomId) {
+    if (remoteStream) {
 
-            alert(
-                "Enter a room name."
+        remoteStream
+            .getTracks()
+            .forEach(
+                track =>
+                    track.stop()
             );
-
-            return;
-        }
-
-        connectSignaling();
-
     }
-);
 
-connectButton.addEventListener(
-    "click",
-    () => {
+    remoteStream = null;
 
-        if (!localStream) {
+    remoteVideo.srcObject =
+        null;
 
-            alert(
-                "Start your camera first."
-            );
+    if (peerConnection) {
 
-            return;
-        }
-
-        if (
-            !websocket ||
-            websocket.readyState !==
-                WebSocket.OPEN
-        ) {
-
-            connectSignaling();
-
-            return;
-        }
-
-        log(
-            "Ready for another person to join."
-        );
-
-        connectButton.innerHTML =
-            "<span>✓</span><span>Waiting...</span>";
-
-    }
-);
-
-leaveButton.addEventListener(
-    "click",
-    leaveRoom
-);
-
-
-/* ============================================================
-   BEFORE PAGE CLOSE
-============================================================ */
-
-window.addEventListener(
-    "beforeunload",
-    () => {
-
-        if (localStream) {
-
-            localStream
-                .getTracks()
-                .forEach(
-                    track => track.stop()
-                );
-
-        }
-
-        if (peerConnection) {
-
+        try {
             peerConnection.close();
-
-        }
-
-        if (websocket) {
-
-            websocket.close();
-
-        }
-
+        } catch {}
     }
-);
+
+    peerConnection = null;
+
+    dataChannel = null;
+
+    setConnectionState(
+        "waiting",
+        "WAITING"
+    );
+
+    log(
+        "The shared place is waiting for your person."
+    );
+}
 
 
 /* ============================================================
-   STARTUP
+   UTILITY
 ============================================================ */
 
-log(
-    "RH WebRTC frontend initialized."
+function clamp(
+    value,
+    min,
+    max
+) {
+
+    return Math.min(
+        Math.max(
+            Number(value),
+            min
+        ),
+        max
+    );
+}
+
+
+/* ============================================================
+   INITIALIZE
+============================================================ */
+
+roomInput.value =
+    RH_CONFIG.defaultRoom;
+
+consolePanel.classList.add(
+    "hidden"
+);
+
+updatePresence(
+    localPresence,
+    localPosition
+);
+
+updatePresence(
+    remotePresence,
+    remotePosition
 );
 
 log(
-    `Default room: ${RH_CONFIG.defaultRoom}`
+    "RH frontend initialized.",
+    "good"
+);
+
+log(
+    "Choose a place to begin."
 );
