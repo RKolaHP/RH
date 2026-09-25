@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>RH — Real Human Presence</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- =====================================================
+         RH HEADER
+    ====================================================== -->
+
+    <header class="rh-header">
+
+        <div class="brand">
+            <div class="brand-mark">RH</div>
+
+            <div>
+                <div class="brand-name">
+                    Real Human Presence
+                </div>
+
+                <div class="brand-subtitle">
+                    Be there, even when you're far away.
+                </div>
+            </div>
+        </div>
+
+        <div class="connection-status">
+            <span id="statusDot" class="status-dot offline"></span>
+            <span id="statusText">Not connected</span>
+        </div>
+
+    </header>
+
+
+    <!-- =====================================================
+         MAIN EXPERIENCE
+    ====================================================== -->
+
+    <main class="experience">
+
+        <section class="hero">
+
+            <div class="hero-copy">
+
+                <span class="eyebrow">
+                    REAL HUMAN PRESENCE
+                </span>
+
+                <h1>
+                    Don't send an avatar.
+                    <span>Send yourself.</span>
+                </h1>
+
+                <p>
+                    RH transforms a normal video call into a shared
+                    digital space where real people can feel closer,
+                    even when distance keeps them apart.
+                </p>
+
+            </div>
+
+
+            <!-- =================================================
+                 SHARED WORLD
+            ================================================== -->
+
+            <div class="world">
+
+                <div class="sun"></div>
+
+                <div class="cloud cloud-one"></div>
+                <div class="cloud cloud-two"></div>
+
+                <div class="mountain mountain-one"></div>
+                <div class="mountain mountain-two"></div>
+
+                <div class="tree tree-one">
+                    <div class="tree-top"></div>
+                    <div class="tree-trunk"></div>
+                </div>
+
+                <div class="tree tree-two">
+                    <div class="tree-top"></div>
+                    <div class="tree-trunk"></div>
+                </div>
+
+                <div class="path"></div>
+
+                <!-- =================================================
+                     REAL YOU
+                ================================================== -->
+
+                <div class="person-card local-card">
+
+                    <div class="video-container">
+
+                        <video
+                            id="localVideo"
+                            autoplay
+                            muted
+                            playsinline>
+                        </video>
+
+                        <div
+                            id="localPlaceholder"
+                            class="video-placeholder">
+
+                            <div class="placeholder-icon">
+                                ◉
+                            </div>
+
+                            <span>
+                                Your camera
+                            </span>
+
+                        </div>
+
+                    </div>
+
+                    <div class="person-info">
+
+                        <div>
+                            <strong>You</strong>
+                            <span id="localState">
+                                Camera off
+                            </span>
+                        </div>
+
+                        <div class="live-indicator">
+                            YOU
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- =================================================
+                     REAL FAMILY
+                ================================================== -->
+
+                <div class="person-card remote-card">
+
+                    <div class="video-container">
+
+                        <video
+                            id="remoteVideo"
+                            autoplay
+                            playsinline>
+                        </video>
+
+                        <div
+                            id="remotePlaceholder"
+                            class="video-placeholder">
+
+                            <div class="placeholder-icon">
+                                ◌
+                            </div>
+
+                            <span id="remoteMessage">
+                                Waiting for family...
+                            </span>
+
+                        </div>
+
+                    </div>
+
+                    <div class="person-info">
+
+                        <div>
+                            <strong>Family</strong>
+                            <span id="remoteState">
+                                Not connected
+                            </span>
+                        </div>
+
+                        <div
+                            id="remoteLive"
+                            class="live-indicator hidden">
+                            LIVE
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =====================================================
+             CONTROL PANEL
+        ====================================================== -->
+
+        <section class="control-panel">
+
+            <div class="room-section">
+
+                <label for="roomInput">
+                    RH ROOM
+                </label>
+
+                <div class="room-input-row">
+
+                    <input
+                        id="roomInput"
+                        type="text"
+                        value="RH-DEMO"
+                        autocomplete="off">
+
+                    <button
+                        id="joinButton"
+                        class="primary-button">
+
+                        Join Room
+
+                    </button>
+
+                </div>
+
+                <div class="room-help">
+                    Share the same room name with the person you
+                    want to connect with.
+                </div>
+
+            </div>
+
+
+            <div class="controls">
+
+                <button
+                    id="cameraButton"
+                    class="control-button">
+
+                    <span>🎥</span>
+                    <span>Start Camera</span>
+
+                </button>
+
+
+                <button
+                    id="muteButton"
+                    class="control-button"
+                    disabled>
+
+                    <span>🎙️</span>
+                    <span>Mute</span>
+
+                </button>
+
+
+                <button
+                    id="connectButton"
+                    class="control-button"
+                    disabled>
+
+                    <span>🤝</span>
+                    <span>Connect</span>
+
+                </button>
+
+
+                <button
+                    id="leaveButton"
+                    class="control-button danger"
+                    disabled>
+
+                    <span>×</span>
+                    <span>Leave</span>
+
+                </button>
+
+            </div>
+
+        </section>
+
+
+        <!-- =====================================================
+             CONNECTION LOG
+        ====================================================== -->
+
+        <section class="debug-panel">
+
+            <div class="debug-header">
+                <span>RH CONNECTION</span>
+                <span id="roomDisplay">Room: RH-DEMO</span>
+            </div>
+
+            <div id="connectionLog" class="connection-log">
+                <div class="log-line">
+                    <span class="log-time">SYSTEM</span>
+                    <span>
+                        RH frontend ready.
+                    </span>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <!-- =====================================================
+         FOOTER
+    ====================================================== -->
+
+    <footer class="rh-footer">
+
+        <div>
+            RH — Real Human Presence
+        </div>
+
+        <div>
+            The environment can be virtual.
+            <strong>The people remain real.</strong>
+        </div>
+
+    </footer>
+
+
+    <script src="app.js"></script>
+
+</body>
+</html>
