@@ -1,1392 +1,1011 @@
 /* ============================================================
    RH — REAL HUMAN PRESENCE
-   Main visual system
-============================================================ */
+   VISUAL SYSTEM
+   ============================================================ */
 
 :root {
 
-    --rh-bg: #080914;
+  --bg: #080a10;
 
-    --rh-panel: rgba(15, 17, 34, 0.82);
+  --panel: rgba(10, 13, 23, 0.74);
 
-    --rh-panel-light: rgba(255, 255, 255, 0.08);
+  --line: rgba(255, 255, 255, 0.12);
 
-    --rh-text: #ffffff;
+  --text: #f5f7fb;
 
-    --rh-muted: rgba(255, 255, 255, 0.65);
+  --muted: #9ba4b6;
 
-    --rh-soft: rgba(255, 255, 255, 0.12);
+  --accent: #b8a4ff;
 
-    --rh-accent: #b8a1ff;
+  --accent2: #7ce8d0;
 
-    --rh-accent-2: #71e7d5;
+  --danger: #ff8e9d;
 
-    --rh-green: #66e39b;
+  --warning: #ffd79a;
 
-    --rh-danger: #ff7084;
+  --shadow:
+    0 24px 80px rgba(0, 0, 0, 0.38);
 
-    --rh-radius: 20px;
-
-    --rh-shadow:
-        0 20px 60px rgba(0, 0, 0, 0.35);
 }
 
 
+/* ============================================================
+   GLOBAL
+   ============================================================ */
+
 * {
-    box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 
 html,
 body {
-    margin: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
 
-    background: var(--rh-bg);
+  margin: 0;
 
-    color: var(--rh-text);
+  width: 100%;
+  height: 100%;
 
-    font-family:
-        Inter,
-        ui-sans-serif,
-        system-ui,
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        sans-serif;
+  overflow: hidden;
+
+  background: var(--bg);
+
+  color: var(--text);
+
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+
 }
 
 
 button,
 input {
-    font: inherit;
+  font: inherit;
 }
 
 
 button {
-    cursor: pointer;
-}
-
-
-.hidden {
-    display: none !important;
+  cursor: pointer;
 }
 
 
 /* ============================================================
-   GENERAL SCREEN
-============================================================ */
+   SCREEN SYSTEM
+   ============================================================ */
 
-.rh-screen {
-    width: 100vw;
-    height: 100vh;
+.screen {
 
-    position: relative;
+  position: fixed;
 
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  inset: 0;
 
-    overflow: hidden;
+  display: none;
+
+}
+
+
+.screen.active {
+  display: block;
 }
 
 
 /* ============================================================
-   WELCOME
-============================================================ */
+   LOBBY
+   ============================================================ */
 
-.rh-welcome {
+#lobby {
 
-    background:
-        radial-gradient(
-            circle at 20% 20%,
-            rgba(184, 161, 255, 0.18),
-            transparent 35%
-        ),
-        radial-gradient(
-            circle at 80% 70%,
-            rgba(113, 231, 213, 0.12),
-            transparent 35%
-        ),
-        #080914;
+  min-height: 100vh;
+
+  display: none;
+
+  place-items: center;
+
+  padding: 32px;
+
+  background:
+
+    radial-gradient(
+      circle at 20% 20%,
+      rgba(184, 164, 255, 0.13),
+      transparent 32%
+    ),
+
+    radial-gradient(
+      circle at 80% 70%,
+      rgba(124, 232, 208, 0.10),
+      transparent 34%
+    ),
+
+    linear-gradient(
+      135deg,
+      #080a10,
+      #10131e
+    );
+
 }
 
 
-.welcome-glow {
-
-    position: absolute;
-
-    width: 650px;
-    height: 650px;
-
-    border-radius: 50%;
-
-    background:
-        radial-gradient(
-            circle,
-            rgba(184, 161, 255, 0.12),
-            transparent 65%
-        );
-
-    filter: blur(20px);
-
-    animation: breathe 7s ease-in-out infinite;
-}
-
-
-@keyframes breathe {
-
-    0%,
-    100% {
-        transform: scale(0.95);
-        opacity: 0.6;
-    }
-
-    50% {
-        transform: scale(1.08);
-        opacity: 1;
-    }
-}
-
-
-.welcome-content {
-
-    position: relative;
-
-    z-index: 2;
-
-    width: min(700px, 90vw);
-
-    text-align: center;
-}
-
-
-.rh-logo {
-
-    display: inline-flex;
-
-    align-items: center;
-
-    gap: 12px;
-
-    margin-bottom: 42px;
-}
-
-
-.rh-logo-mark {
-
-    display: flex;
-
-    align-items: center;
-    justify-content: center;
-
-    width: 54px;
-    height: 54px;
-
-    border-radius: 17px;
-
-    background:
-        linear-gradient(
-            135deg,
-            rgba(184, 161, 255, 0.95),
-            rgba(113, 231, 213, 0.8)
-        );
-
-    color: #080914;
-
-    font-size: 20px;
-
-    font-weight: 900;
-
-    letter-spacing: -1px;
-}
-
-
-.rh-logo-text {
-
-    font-size: 12px;
-
-    font-weight: 800;
-
-    letter-spacing: 3px;
-
-    color: rgba(255, 255, 255, 0.65);
-}
-
-
-.welcome-content h1 {
-
-    margin: 0;
-
-    font-size: clamp(52px, 8vw, 94px);
-
-    line-height: 0.95;
-
-    letter-spacing: -5px;
-
-    font-weight: 800;
-}
-
-
-.welcome-content h1 span {
-
-    background:
-        linear-gradient(
-            90deg,
-            var(--rh-accent),
-            var(--rh-accent-2)
-        );
-
-    -webkit-background-clip: text;
-    background-clip: text;
-
-    color: transparent;
-}
-
-
-.welcome-description {
-
-    margin: 35px 0 38px;
-
-    font-size: 22px;
-
-    line-height: 1.55;
-
-    color: var(--rh-muted);
-}
-
-
-.primary-btn {
-
-    border: none;
-
-    padding: 15px 28px;
-
-    border-radius: 999px;
-
-    color: #080914;
-
-    background:
-        linear-gradient(
-            135deg,
-            var(--rh-accent),
-            var(--rh-accent-2)
-        );
-
-    font-weight: 800;
-
-    box-shadow:
-        0 12px 40px rgba(184, 161, 255, 0.22);
-
-    transition:
-        transform 0.2s ease,
-        box-shadow 0.2s ease;
-}
-
-
-.primary-btn:hover {
-
-    transform: translateY(-2px);
-
-    box-shadow:
-        0 16px 50px rgba(184, 161, 255, 0.35);
-}
-
-
-.welcome-note {
-
-    margin-top: 22px;
-
-    color: rgba(255, 255, 255, 0.42);
-
-    font-size: 12px;
+#lobby.active {
+  display: grid;
 }
 
 
 /* ============================================================
-   SETUP
-============================================================ */
+   BRAND
+   ============================================================ */
 
-.rh-setup {
+.brand {
 
-    background:
-        radial-gradient(
-            circle at 20% 10%,
-            rgba(184, 161, 255, 0.12),
-            transparent 30%
-        ),
-        #080914;
+  position: absolute;
+
+  top: 42px;
+  left: 46px;
+
+  display: flex;
+
+  gap: 16px;
+
+  align-items: center;
+
 }
 
 
-.setup-card {
+.brand-mark {
 
-    width: min(900px, 92vw);
+  width: 54px;
+  height: 54px;
 
-    max-height: 92vh;
+  border:
+    1px solid var(--line);
 
-    overflow-y: auto;
+  border-radius: 17px;
 
-    padding: 42px;
+  display: grid;
 
-    border:
-        1px solid
-        rgba(255, 255, 255, 0.1);
+  place-items: center;
 
-    border-radius: 30px;
+  font-weight: 800;
 
-    background:
-        rgba(14, 16, 31, 0.85);
+  letter-spacing: -0.08em;
 
-    backdrop-filter: blur(25px);
+  background:
+    rgba(255, 255, 255, 0.04);
 
-    box-shadow: var(--rh-shadow);
+  box-shadow: var(--shadow);
+
 }
 
 
-.setup-brand {
+.brand-text h1 {
 
-    width: 48px;
-    height: 48px;
+  font-size: 13px;
 
-    display: flex;
+  letter-spacing: 0.22em;
 
-    align-items: center;
-    justify-content: center;
+  margin: 0;
 
-    border-radius: 15px;
-
-    margin-bottom: 25px;
-
-    background:
-        linear-gradient(
-            135deg,
-            var(--rh-accent),
-            var(--rh-accent-2)
-        );
-
-    color: #080914;
-
-    font-weight: 900;
 }
 
 
-.setup-card h2 {
+.brand-text p {
 
-    margin: 0 0 10px;
+  margin: 5px 0 0;
 
-    font-size: 34px;
+  color: var(--muted);
 
-    letter-spacing: -1.5px;
+  font-size: 12px;
+
 }
 
 
-.setup-card > p {
+/* ============================================================
+   LOBBY CARD
+   ============================================================ */
 
-    margin: 0 0 30px;
+.lobby-card {
 
-    max-width: 650px;
+  width: min(590px, 100%);
 
-    color: var(--rh-muted);
+  padding: 42px;
 
-    line-height: 1.6;
+  border:
+    1px solid var(--line);
+
+  border-radius: 30px;
+
+  background:
+    var(--panel);
+
+  backdrop-filter:
+    blur(20px);
+
+  box-shadow:
+    var(--shadow);
+
 }
 
 
-.place-grid {
+.eyebrow {
 
-    display: grid;
+  font-size: 10px;
 
-    grid-template-columns:
-        repeat(2, minmax(0, 1fr));
+  letter-spacing: 0.22em;
 
-    gap: 14px;
+  color: var(--accent2);
+
+  font-weight: 800;
+
 }
 
 
-.place-card {
+.lobby-card h2 {
 
-    text-align: left;
+  font-size: 42px;
 
-    border:
-        1px solid
-        rgba(255, 255, 255, 0.08);
+  line-height: 1.02;
 
-    border-radius: 20px;
+  letter-spacing: -0.045em;
 
-    padding: 22px;
+  margin: 13px 0 15px;
 
-    background:
-        rgba(255, 255, 255, 0.04);
-
-    color: white;
-
-    transition:
-        transform 0.2s ease,
-        background 0.2s ease,
-        border 0.2s ease;
 }
 
 
-.place-card:hover {
+.intro {
 
-    transform: translateY(-2px);
+  color: var(--muted);
 
-    background:
-        rgba(255, 255, 255, 0.07);
+  line-height: 1.65;
+
+  font-size: 14px;
+
 }
 
 
-.place-card.active {
+/* ============================================================
+   ROOM INPUT
+   ============================================================ */
 
-    border-color:
-        rgba(184, 161, 255, 0.75);
+.lobby-card label {
 
-    background:
-        rgba(184, 161, 255, 0.12);
+  display: block;
+
+  font-size: 11px;
+
+  color: var(--muted);
+
+  margin: 28px 0 8px;
+
+  letter-spacing: 0.12em;
+
 }
 
 
-.place-icon {
+.room-row {
 
-    display: block;
+  display: flex;
 
-    font-size: 30px;
+  gap: 10px;
 
-    margin-bottom: 14px;
 }
 
 
-.place-title {
+.room-row input {
 
-    display: block;
+  min-width: 0;
 
-    font-weight: 800;
+  flex: 1;
 
-    font-size: 16px;
+  border:
+    1px solid var(--line);
 
-    margin-bottom: 6px;
+  border-radius: 14px;
+
+  background:
+    rgba(255, 255, 255, 0.05);
+
+  color: var(--text);
+
+  padding: 15px 16px;
+
+  outline: none;
+
 }
 
 
-.place-description {
+.room-row input:focus {
 
-    display: block;
+  border-color:
+    rgba(184, 164, 255, 0.7);
 
-    color: var(--rh-muted);
-
-    font-size: 13px;
-
-    line-height: 1.5;
 }
 
 
-.room-section {
+.primary {
 
-    margin-top: 30px;
+  border: 0;
 
-    padding-top: 25px;
+  border-radius: 14px;
 
-    border-top:
-        1px solid
-        rgba(255, 255, 255, 0.08);
+  padding: 0 22px;
+
+  background: var(--text);
+
+  color: #080a10;
+
+  font-weight: 800;
+
 }
 
 
-.room-section label {
+/* ============================================================
+   STATUS CHECKS
+   ============================================================ */
 
-    display: block;
+.checks {
 
-    margin-bottom: 9px;
+  display: flex;
 
-    font-size: 13px;
+  gap: 18px;
 
-    font-weight: 700;
+  flex-wrap: wrap;
 
-    color: var(--rh-muted);
-}
+  margin-top: 20px;
 
+  font-size: 11px;
 
-.room-input-row {
+  color: var(--muted);
 
-    display: flex;
-
-    gap: 10px;
-}
-
-
-.room-input-row input {
-
-    flex: 1;
-
-    min-width: 0;
-
-    border:
-        1px solid
-        rgba(255, 255, 255, 0.12);
-
-    outline: none;
-
-    border-radius: 14px;
-
-    padding: 14px 16px;
-
-    color: white;
-
-    background:
-        rgba(255, 255, 255, 0.06);
-}
-
-
-.room-input-row input:focus {
-
-    border-color:
-        rgba(184, 161, 255, 0.7);
-}
-
-
-.room-section p {
-
-    margin: 9px 0 0;
-
-    font-size: 12px;
-
-    color: rgba(255, 255, 255, 0.4);
 }
 
 
 /* ============================================================
    WORLD
-============================================================ */
+   ============================================================ */
 
-.rh-world {
+#rhCanvas {
 
-    position: fixed;
+  position: absolute;
 
-    inset: 0;
+  inset: 0;
 
-    overflow: hidden;
+  width: 100%;
 
-    background: #101827;
-}
+  height: 100%;
 
+  display: block;
 
-.rh-canvas {
-
-    position: absolute;
-
-    inset: 0;
-
-    width: 100%;
-    height: 100%;
-
-    display: block;
-
-    z-index: 1;
 }
 
 
 /* ============================================================
-   SOURCE VIDEOS
-============================================================ */
+   SOURCE VIDEO
+
+   Hidden because the final RH interface is not a traditional
+   video call.
+   ============================================================ */
 
 #localVideo,
 #remoteVideo {
 
-    position: fixed;
+  position: fixed;
 
-    width: 1px;
-    height: 1px;
+  width: 1px;
 
-    opacity: 0;
+  height: 1px;
 
-    pointer-events: none;
+  opacity: 0;
 
-    left: -10000px;
+  pointer-events: none;
+
 }
 
 
 /* ============================================================
-   REAL HUMAN PRESENCE
-============================================================ */
+   PERSON CANVASES
 
-.presence-person {
+   These feed the Three.js person textures.
+   ============================================================ */
 
-    position: absolute;
+#localCanvas,
+#remoteCanvas {
 
-    width: 210px;
-    height: 300px;
+  position: fixed;
 
-    z-index: 8;
+  pointer-events: none;
 
-    pointer-events: none;
+  opacity: 0;
 
-    transform:
-        translate(-50%, -50%);
+  width: 1px;
 
-    transition:
-        filter 0.2s ease;
-}
+  height: 1px;
 
-
-.presence-canvas {
-
-    width: 100%;
-    height: 100%;
-
-    display: block;
-
-    object-fit: contain;
-
-    filter:
-        drop-shadow(
-            0 16px 18px
-            rgba(0, 0, 0, 0.28)
-        );
-}
-
-
-.person-label {
-
-    position: absolute;
-
-    left: 50%;
-    bottom: -5px;
-
-    transform: translateX(-50%);
-
-    display: flex;
-
-    align-items: center;
-
-    gap: 6px;
-
-    padding: 6px 11px;
-
-    border-radius: 999px;
-
-    background:
-        rgba(10, 12, 25, 0.68);
-
-    backdrop-filter: blur(12px);
-
-    font-size: 11px;
-
-    font-weight: 700;
-
-    white-space: nowrap;
-
-    opacity: 0;
-
-    transition: opacity 0.2s ease;
-}
-
-
-.presence-person:hover .person-label {
-
-    opacity: 1;
-}
-
-
-.live-dot {
-
-    width: 7px;
-    height: 7px;
-
-    border-radius: 50%;
-
-    background: var(--rh-green);
-
-    box-shadow:
-        0 0 10px
-        rgba(102, 227, 155, 0.75);
-
-    animation: livePulse 1.6s infinite;
-}
-
-
-@keyframes livePulse {
-
-    0%,
-    100% {
-        opacity: 0.55;
-    }
-
-    50% {
-        opacity: 1;
-    }
 }
 
 
 /* ============================================================
-   HEADER
-============================================================ */
+   HUD
+   ============================================================ */
 
-.world-header {
+.hud.top {
 
-    position: absolute;
+  position: absolute;
 
-    top: 20px;
-    left: 22px;
-    right: 22px;
+  top: 22px;
 
-    z-index: 20;
+  left: 24px;
 
-    display: flex;
+  right: 24px;
 
-    align-items: center;
+  display: flex;
 
-    justify-content: space-between;
+  align-items: center;
 
-    pointer-events: none;
+  gap: 14px;
+
+  z-index: 10;
+
 }
 
 
-.world-brand {
+.hud-brand {
 
-    display: flex;
+  display: flex;
 
-    align-items: center;
+  align-items: center;
 
-    gap: 12px;
+  gap: 10px;
 
-    padding: 10px 14px;
+  padding: 10px 13px;
 
-    border-radius: 17px;
+  border:
+    1px solid var(--line);
 
-    background:
-        rgba(9, 12, 25, 0.58);
+  border-radius: 14px;
 
-    backdrop-filter: blur(18px);
+  background:
+    rgba(8, 10, 16, 0.5);
+
+  backdrop-filter:
+    blur(14px);
+
 }
 
 
-.world-logo {
+.hud-brand strong {
 
-    width: 42px;
-    height: 42px;
+  font-size: 16px;
 
-    display: flex;
+  letter-spacing: -0.08em;
 
-    align-items: center;
-    justify-content: center;
-
-    border-radius: 13px;
-
-    background:
-        linear-gradient(
-            135deg,
-            var(--rh-accent),
-            var(--rh-accent-2)
-        );
-
-    color: #080914;
-
-    font-size: 15px;
-
-    font-weight: 900;
 }
 
 
-.world-title {
+.hud-brand span {
 
-    font-size: 11px;
+  font-size: 9px;
 
-    font-weight: 900;
+  letter-spacing: 0.16em;
 
-    letter-spacing: 1.5px;
+  color: var(--muted);
+
 }
 
 
-.world-place {
+.room-pill,
+.connection {
 
-    margin-top: 3px;
+  padding: 10px 13px;
 
-    font-size: 13px;
+  border:
+    1px solid var(--line);
 
-    color: var(--rh-muted);
+  border-radius: 14px;
+
+  background:
+    rgba(8, 10, 16, 0.5);
+
+  backdrop-filter:
+    blur(14px);
+
+  font-size: 10px;
+
+  color: var(--muted);
+
 }
 
 
-.world-status {
+.room-pill b {
 
-    display: flex;
+  color: var(--text);
 
-    align-items: center;
+  letter-spacing: 0.08em;
 
-    gap: 8px;
 }
 
 
-.connection-pill,
-.room-pill {
+.connection {
 
-    padding: 10px 14px;
+  margin-left: auto;
 
-    border-radius: 999px;
-
-    background:
-        rgba(9, 12, 25, 0.58);
-
-    backdrop-filter: blur(18px);
-
-    font-size: 11px;
-
-    font-weight: 700;
 }
 
 
-.connection-pill {
+.connection.connected {
 
-    display: flex;
+  color: var(--accent2);
 
-    align-items: center;
+  border-color:
+    rgba(124, 232, 208, 0.3);
 
-    gap: 7px;
 }
 
 
-.status-dot {
+.connection.waiting {
 
-    width: 8px;
-    height: 8px;
+  color: var(--warning);
 
-    border-radius: 50%;
-}
-
-
-.status-dot.waiting {
-
-    background: #ffc86b;
-
-    box-shadow:
-        0 0 10px
-        rgba(255, 200, 107, 0.6);
-}
-
-
-.status-dot.connected {
-
-    background: var(--rh-green);
-
-    box-shadow:
-        0 0 10px
-        rgba(102, 227, 155, 0.7);
-}
-
-
-.status-dot.error {
-
-    background: var(--rh-danger);
-}
-
-
-.room-pill strong {
-
-    margin-left: 4px;
-
-    color: white;
 }
 
 
 /* ============================================================
-   WAITING
-============================================================ */
+   PRESENCE CARD
+   ============================================================ */
 
-.waiting-message {
+.presence-card {
 
-    position: absolute;
+  position: absolute;
 
-    z-index: 15;
+  left: 26px;
 
-    left: 50%;
+  bottom: 102px;
 
-    top: 50%;
+  width: min(
+    340px,
+    calc(100vw - 52px)
+  );
 
-    transform:
-        translate(-50%, -50%);
+  padding: 20px;
 
-    display: flex;
+  border:
+    1px solid var(--line);
 
-    align-items: center;
+  border-radius: 22px;
 
-    gap: 15px;
+  background:
+    rgba(8, 10, 16, 0.48);
 
-    padding: 17px 22px;
+  backdrop-filter:
+    blur(18px);
 
-    border-radius: 18px;
+  z-index: 10;
 
-    background:
-        rgba(8, 10, 20, 0.56);
-
-    backdrop-filter: blur(20px);
-
-    border:
-        1px solid
-        rgba(255, 255, 255, 0.08);
-
-    box-shadow:
-        0 20px 50px
-        rgba(0, 0, 0, 0.2);
-
-    transition:
-        opacity 0.3s ease,
-        transform 0.3s ease;
 }
 
 
-.waiting-message.hidden {
+.presence-card h2 {
 
-    opacity: 0;
+  font-size: 20px;
 
-    pointer-events: none;
+  margin: 8px 0 7px;
 
-    transform:
-        translate(-50%, -46%);
 }
 
 
-.waiting-icon {
+.presence-card p {
 
-    width: 36px;
-    height: 36px;
+  font-size: 12px;
 
-    border-radius: 50%;
+  line-height: 1.5;
 
-    display: flex;
+  color: var(--muted);
 
-    align-items: center;
-    justify-content: center;
+  margin: 0;
 
-    background:
-        rgba(184, 161, 255, 0.14);
-
-    color: var(--rh-accent);
-
-    font-size: 24px;
 }
 
 
-.waiting-message strong {
+.presence-line {
 
-    display: block;
+  height: 3px;
 
-    font-size: 14px;
+  margin-top: 17px;
+
+  background:
+    rgba(255,255,255,.08);
+
+  border-radius: 20px;
+
+  position: relative;
+
+  overflow: hidden;
+
 }
 
 
-.waiting-message span {
+.presence-line span:first-child {
 
-    display: block;
+  display: block;
 
-    margin-top: 3px;
+  height: 100%;
 
-    color: var(--rh-muted);
+  width: 50%;
 
-    font-size: 12px;
+  background:
+    linear-gradient(
+      90deg,
+      var(--accent),
+      var(--accent2)
+    );
+
+  border-radius: 20px;
+
 }
 
 
 /* ============================================================
    CONTROLS
-============================================================ */
+   ============================================================ */
 
-.world-controls {
+.controls {
 
-    position: absolute;
+  position: absolute;
 
-    z-index: 30;
+  left: 50%;
 
-    bottom: 25px;
+  bottom: 28px;
 
-    left: 50%;
+  transform:
+    translateX(-50%);
 
-    transform:
-        translateX(-50%);
+  display: flex;
 
-    display: flex;
+  gap: 8px;
 
-    gap: 9px;
+  padding: 8px;
 
-    padding: 9px;
+  border:
+    1px solid var(--line);
 
-    border-radius: 20px;
+  border-radius: 18px;
 
-    background:
-        rgba(8, 10, 20, 0.62);
+  background:
+    rgba(8, 10, 16, 0.58);
 
-    backdrop-filter: blur(22px);
+  backdrop-filter:
+    blur(20px);
 
-    border:
-        1px solid
-        rgba(255, 255, 255, 0.08);
+  z-index: 12;
+
+  box-shadow: var(--shadow);
+
 }
 
 
-.control-btn {
+.controls button {
 
-    min-width: 66px;
+  border:
+    1px solid transparent;
 
-    border: none;
+  border-radius: 12px;
 
-    border-radius: 14px;
+  background:
+    rgba(255,255,255,.055);
 
-    padding: 10px 12px;
+  color: var(--text);
 
-    display: flex;
+  padding: 10px 13px;
 
-    flex-direction: column;
+  font-size: 12px;
 
-    align-items: center;
-
-    gap: 4px;
-
-    color: rgba(255, 255, 255, 0.82);
-
-    background:
-        rgba(255, 255, 255, 0.06);
-
-    transition:
-        transform 0.15s ease,
-        background 0.15s ease;
 }
 
 
-.control-btn:hover {
+.controls button:hover {
 
-    transform: translateY(-2px);
+  background:
+    rgba(255,255,255,.10);
 
-    background:
-        rgba(255, 255, 255, 0.11);
 }
 
 
-.control-btn span {
+.controls button.active {
 
-    font-size: 10px;
+  border-color:
+    rgba(184,164,255,.35);
 
-    font-weight: 700;
-}
+  background:
+    rgba(184,164,255,.12);
 
-
-.walk-control {
-
-    background:
-        rgba(184, 161, 255, 0.16);
-}
-
-
-.walk-control.active {
-
-    background:
-        linear-gradient(
-            135deg,
-            rgba(184, 161, 255, 0.3),
-            rgba(113, 231, 213, 0.18)
-        );
-}
-
-
-.exit-control:hover {
-
-    background:
-        rgba(255, 112, 132, 0.16);
 }
 
 
 /* ============================================================
    MOVEMENT HINT
-============================================================ */
+   ============================================================ */
 
 .movement-hint {
 
-    position: absolute;
+  position: absolute;
 
-    bottom: 105px;
+  right: 24px;
 
-    left: 50%;
+  bottom: 32px;
 
-    transform:
-        translateX(-50%);
+  color:
+    rgba(255,255,255,.52);
 
-    z-index: 15;
+  font-size: 10px;
 
-    padding: 8px 13px;
+  z-index: 10;
 
-    border-radius: 999px;
-
-    background:
-        rgba(8, 10, 20, 0.42);
-
-    backdrop-filter: blur(12px);
-
-    color:
-        rgba(255, 255, 255, 0.48);
-
-    font-size: 11px;
-
-    white-space: nowrap;
-
-    pointer-events: none;
 }
 
 
 /* ============================================================
    DEBUG
-============================================================ */
+   ============================================================ */
 
 .debug-panel {
 
-    position: absolute;
+  position: absolute;
 
-    right: 20px;
+  right: 24px;
 
-    bottom: 22px;
+  top: 82px;
 
-    z-index: 25;
+  width: 190px;
 
-    width: 165px;
+  padding: 13px;
 
-    padding: 13px;
+  border:
+    1px solid var(--line);
 
-    border-radius: 16px;
+  border-radius: 16px;
 
-    background:
-        rgba(7, 9, 18, 0.62);
+  background:
+    rgba(8,10,16,.64);
 
-    backdrop-filter: blur(18px);
+  backdrop-filter:
+    blur(18px);
 
-    border:
-        1px solid
-        rgba(255, 255, 255, 0.06);
+  font-size: 10px;
 
-    font-size: 10px;
+  z-index: 15;
+
+  display: none;
+
+}
+
+
+.debug-panel.visible {
+  display: block;
 }
 
 
 .debug-title {
 
-    margin-bottom: 8px;
+  font-size: 9px;
 
-    font-size: 9px;
+  letter-spacing: .18em;
 
-    letter-spacing: 1.5px;
+  margin-bottom: 8px;
 
-    color:
-        rgba(255, 255, 255, 0.4);
+  color: var(--accent2);
 
-    font-weight: 900;
 }
 
 
-.debug-row {
+.debug-panel div:not(.debug-title) {
 
-    display: flex;
+  display: flex;
 
-    justify-content: space-between;
+  justify-content: space-between;
 
-    padding: 3px 0;
+  padding: 4px 0;
 
-    color:
-        rgba(255, 255, 255, 0.45);
+  color: var(--muted);
+
 }
 
 
-.debug-row strong {
+.debug-panel b {
+  color: var(--text);
+}
 
-    color:
-        rgba(255, 255, 255, 0.82);
 
-    font-weight: 700;
+.debug-toggle {
+
+  position: absolute;
+
+  right: 24px;
+
+  top: 22px;
+
+  border:
+    1px solid var(--line);
+
+  border-radius: 10px;
+
+  background:
+    rgba(8,10,16,.5);
+
+  color: var(--muted);
+
+  padding: 8px 9px;
+
+  font-size: 9px;
+
+  z-index: 16;
+
 }
 
 
 /* ============================================================
    TOAST
-============================================================ */
+   ============================================================ */
 
-.rh-toast {
+.toast {
 
-    position: absolute;
+  position: absolute;
 
-    left: 50%;
+  left: 50%;
 
-    top: 85px;
+  top: 78px;
 
-    transform:
-        translate(-50%, -15px);
+  transform:
+    translateX(-50%)
+    translateY(-10px);
 
-    z-index: 100;
+  opacity: 0;
 
-    opacity: 0;
+  transition: .25s;
 
-    pointer-events: none;
+  z-index: 20;
 
-    padding: 11px 17px;
+  border:
+    1px solid var(--line);
 
-    border-radius: 999px;
+  background:
+    rgba(8,10,16,.82);
 
-    background:
-        rgba(8, 10, 20, 0.8);
+  padding: 10px 14px;
 
-    backdrop-filter: blur(18px);
+  border-radius: 12px;
 
-    border:
-        1px solid
-        rgba(255, 255, 255, 0.1);
+  font-size: 11px;
 
-    font-size: 12px;
+  pointer-events: none;
 
-    transition:
-        opacity 0.25s ease,
-        transform 0.25s ease;
 }
 
 
-.rh-toast.show {
+.toast.show {
 
-    opacity: 1;
+  opacity: 1;
 
-    transform:
-        translate(-50%, 0);
+  transform:
+    translateX(-50%)
+    translateY(0);
+
 }
 
 
 /* ============================================================
    MOBILE
-============================================================ */
+   ============================================================ */
 
 @media (max-width: 760px) {
 
-    .welcome-content h1 {
+  .brand {
 
-        font-size: 54px;
+    left: 20px;
+    top: 20px;
 
-        letter-spacing: -3px;
-    }
-
-
-    .welcome-description {
-
-        font-size: 17px;
-    }
+  }
 
 
-    .setup-card {
+  .lobby-card {
 
-        padding: 25px;
+    padding: 28px;
 
-        border-radius: 24px;
-    }
+    border-radius: 24px;
 
-
-    .setup-card h2 {
-
-        font-size: 26px;
-    }
+  }
 
 
-    .place-grid {
+  .lobby-card h2 {
 
-        grid-template-columns: 1fr;
-    }
+    font-size: 32px;
 
-
-    .room-input-row {
-
-        flex-direction: column;
-    }
+  }
 
 
-    .world-header {
+  .room-row {
 
-        top: 10px;
+    flex-direction: column;
 
-        left: 10px;
-
-        right: 10px;
-
-        align-items: flex-start;
-    }
+  }
 
 
-    .world-status {
+  .primary {
 
-        flex-direction: column;
+    height: 48px;
 
-        align-items: flex-end;
-    }
-
-
-    .world-title {
-
-        font-size: 9px;
-    }
+  }
 
 
-    .connection-pill,
-    .room-pill {
+  .controls {
 
-        padding: 7px 10px;
+    left: 12px;
 
-        font-size: 9px;
-    }
+    right: 12px;
 
+    bottom: 12px;
 
-    .world-controls {
+    transform: none;
 
-        bottom: 12px;
+    justify-content: center;
 
-        width: calc(100% - 20px);
+    flex-wrap: wrap;
 
-        justify-content: center;
-
-        gap: 3px;
-
-        padding: 6px;
-    }
+  }
 
 
-    .control-btn {
+  .controls button span {
 
-        min-width: 50px;
+    display: none;
 
-        padding: 8px 6px;
-    }
-
-
-    .control-btn span {
-
-        font-size: 8px;
-    }
+  }
 
 
-    .movement-hint {
+  .presence-card {
 
-        bottom: 82px;
+    left: 14px;
 
-        font-size: 9px;
-    }
+    bottom: 105px;
 
-
-    .debug-panel {
-
-        display: none;
-    }
+  }
 
 
-    .presence-person {
+  .movement-hint {
 
-        width: 160px;
+    display: none;
 
-        height: 235px;
-    }
+  }
 
 
-    .waiting-message {
+  .hud.top {
 
-        width: calc(100% - 30px);
-    }
+    left: 12px;
+
+    right: 12px;
+
+    top: 12px;
+
+  }
+
+
+  .hud-brand span {
+
+    display: none;
+
+  }
+
+
+  .debug-toggle {
+
+    right: 12px;
+
+    top: 12px;
+
+  }
+
 }
