@@ -1,520 +1,408 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+  <meta charset="UTF-8" />
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
 
-    <meta
-        name="description"
-        content="RH - Real Human Presence. Be there, even when you're far away."
-    >
+  <meta
+    name="theme-color"
+    content="#080a10"
+  />
 
-    <title>RH..Real Human Presence</title>
+  <title>RH — Real Human Presence</title>
 
-    <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
 
-    <!-- =========================================================
-         RH LANDING / WELCOME SCREEN
-    ========================================================== -->
+  <!-- =========================================================
+       RH APPLICATION
+       ========================================================= -->
 
-    <section id="rhWelcome" class="rh-screen rh-welcome">
+  <main id="app">
 
-        <div class="welcome-glow"></div>
+    <!-- =======================================================
+         LOBBY
+         ======================================================= -->
 
-        <div class="welcome-content">
+    <section id="lobby" class="screen active">
 
-            <div class="rh-logo">
-                <span class="rh-logo-mark">RH</span>
-                <span class="rh-logo-text">
-                    REAL HUMAN PRESENCE
-                </span>
-            </div>
+      <div class="brand">
 
-            <h1>
-                Be there,<br>
-                <span>even when you're far away.</span>
-            </h1>
+        <div class="brand-mark">
+          RH
+        </div>
 
-            <p class="welcome-description">
-                The place is virtual.<br>
-                The people are real.
-            </p>
+        <div class="brand-text">
+          <h1>REAL HUMAN PRESENCE</h1>
 
-            <button
-                id="enterRhBtn"
-                class="primary-btn"
-                type="button"
-            >
-                Enter RH
-            </button>
+          <p>
+            The place is virtual. The people are live.
+          </p>
+        </div>
 
-            <p class="welcome-note">
-                Your camera and microphone are used only for the live
-                connection.
-            </p>
+      </div>
+
+
+      <div class="lobby-card">
+
+        <span class="eyebrow">
+          WALK TOGETHER
+        </span>
+
+        <h2>
+          Be there, even when you're far away.
+        </h2>
+
+        <p class="intro">
+
+          RH creates a shared virtual place for two real people.
+          Your camera, microphone, voice and movement remain yours —
+          RH simply gives you a place to be together.
+
+        </p>
+
+
+        <label for="roomInput">
+          ROOM NAME
+        </label>
+
+        <div class="room-row">
+
+          <input
+            id="roomInput"
+            type="text"
+            value="RH-DEMO"
+            maxlength="32"
+            autocomplete="off"
+          />
+
+          <button
+            id="startBtn"
+            class="primary"
+          >
+            Enter RH
+          </button>
 
         </div>
+
+
+        <div class="checks">
+
+          <span id="secureCheck">
+            ● HTTPS —
+          </span>
+
+          <span id="mediaCheck">
+            ● Camera —
+          </span>
+
+          <span id="signalCheck">
+            ● Signal —
+          </span>
+
+        </div>
+
+      </div>
 
     </section>
 
 
-    <!-- =========================================================
-         PLACE SELECTION
-    ========================================================== -->
+    <!-- =======================================================
+         SHARED WORLD
+         ======================================================= -->
 
-    <section
-        id="rhSetup"
-        class="rh-screen rh-setup hidden"
-    >
+    <section id="world" class="screen">
 
-        <div class="setup-card">
-
-            <div class="setup-brand">
-                RH
-            </div>
-
-            <h2>Where do you want to be together?</h2>
-
-            <p>
-                Choose a shared place. You and your family will remain
-                live while the environment becomes virtual.
-            </p>
+      <!-- Three.js renders the virtual environment here -->
+      <canvas id="rhCanvas"></canvas>
 
 
-            <div class="place-grid">
+      <!-- =====================================================
+           REAL VIDEO SOURCES
 
-                <button
-                    class="place-card active"
-                    data-place="park"
-                    type="button"
-                >
-                    <span class="place-icon">🌳</span>
-                    <span class="place-title">Quiet Park</span>
-                    <span class="place-description">
-                        Walk, talk and spend time together.
-                    </span>
-                </button>
+           These are intentionally hidden from the interface.
 
+           The user does NOT appear as a normal video rectangle.
 
-                <button
-                    class="place-card"
-                    data-place="temple"
-                    type="button"
-                >
-                    <span class="place-icon">🛕</span>
-                    <span class="place-title">Devotional Place</span>
-                    <span class="place-description">
-                        A peaceful shared space.
-                    </span>
-                </button>
+           JavaScript takes these live video streams and places
+           the real person into the virtual environment.
+           ===================================================== -->
+
+      <video
+        id="localVideo"
+        autoplay
+        muted
+        playsinline
+      ></video>
+
+      <video
+        id="remoteVideo"
+        autoplay
+        playsinline
+      ></video>
 
 
-                <button
-                    class="place-card"
-                    data-place="shopping"
-                    type="button"
-                >
-                    <span class="place-icon">🛍️</span>
-                    <span class="place-title">Shopping Street</span>
-                    <span class="place-description">
-                        Walk around and explore together.
-                    </span>
-                </button>
+      <!-- =====================================================
+           PERSON COMPOSITION CANVASES
+           ===================================================== -->
+
+      <canvas id="localCanvas"></canvas>
+
+      <canvas id="remoteCanvas"></canvas>
 
 
-                <button
-                    class="place-card"
-                    data-place="campus"
-                    type="button"
-                >
-                    <span class="place-icon">🎓</span>
-                    <span class="place-title">Campus</span>
-                    <span class="place-description">
-                        Visit a familiar place together.
-                    </span>
-                </button>
+      <!-- =====================================================
+           TOP HUD
+           ===================================================== -->
 
-            </div>
+      <header class="hud top">
 
+        <div class="hud-brand">
 
-            <div class="room-section">
+          <strong>RH</strong>
 
-                <label for="roomInput">
-                    RH Room
-                </label>
-
-                <div class="room-input-row">
-
-                    <input
-                        id="roomInput"
-                        type="text"
-                        value="RH-DEMO"
-                        maxlength="32"
-                        autocomplete="off"
-                    >
-
-                    <button
-                        id="startRhBtn"
-                        class="primary-btn"
-                        type="button"
-                    >
-                        Start Presence
-                    </button>
-
-                </div>
-
-                <p>
-                    Share the same room name with the person you want
-                    to meet.
-                </p>
-
-            </div>
+          <span>
+            REAL HUMAN PRESENCE
+          </span>
 
         </div>
+
+
+        <div class="room-pill">
+
+          ROOM
+
+          <b id="roomLabel">
+            RH-DEMO
+          </b>
+
+        </div>
+
+
+        <div
+          id="connectionState"
+          class="connection waiting"
+        >
+          Waiting
+        </div>
+
+      </header>
+
+
+      <!-- =====================================================
+           PRESENCE INFORMATION
+           ===================================================== -->
+
+      <aside class="presence-card">
+
+        <span class="eyebrow">
+          SHARED PRESENCE
+        </span>
+
+        <h2 id="presenceTitle">
+          Waiting for your person
+        </h2>
+
+        <p id="presenceText">
+          Share the room name with someone you love.
+        </p>
+
+
+        <div class="presence-line">
+
+          <span></span>
+
+          <span id="participantCount">
+            1 / 2
+          </span>
+
+        </div>
+
+      </aside>
+
+
+      <!-- =====================================================
+           CONTROLS
+           ===================================================== -->
+
+      <div class="controls">
+
+        <button
+          id="muteBtn"
+          title="Mute microphone"
+        >
+          🎙️
+          <span>Mute</span>
+        </button>
+
+
+        <button
+          id="cameraBtn"
+          title="Turn camera off"
+        >
+          📷
+          <span>Camera</span>
+        </button>
+
+
+        <button
+          id="walkBtn"
+          title="Toggle walking"
+          class="active"
+        >
+          🚶
+          <span>Walking</span>
+        </button>
+
+
+        <button
+          id="meetBtn"
+          title="Meet together"
+        >
+          🤝
+          <span>Meet</span>
+        </button>
+
+
+        <button
+          id="shareBtn"
+          title="Share room"
+        >
+          🔗
+          <span>Share</span>
+        </button>
+
+
+        <button
+          id="exitBtn"
+          title="Exit RH"
+        >
+          ✕
+          <span>Exit</span>
+        </button>
+
+      </div>
+
+
+      <!-- =====================================================
+           MOVEMENT HELP
+           ===================================================== -->
+
+      <div class="movement-hint">
+
+        Click anywhere to walk ·
+        Use W A S D or arrow keys
+
+      </div>
+
+
+      <!-- =====================================================
+           DEVELOPMENT DIAGNOSTICS
+
+           Keep this during development.
+
+           It makes it much easier to identify whether a failure
+           comes from camera, canvas, segmentation, signaling,
+           or WebRTC.
+           ===================================================== -->
+
+      <section id="debugPanel" class="debug-panel">
+
+        <div class="debug-title">
+          RH SYSTEM
+        </div>
+
+
+        <div>
+          <span>HTTPS</span>
+          <b id="debugHttps">—</b>
+        </div>
+
+
+        <div>
+          <span>Camera</span>
+          <b id="debugCamera">—</b>
+        </div>
+
+
+        <div>
+          <span>Canvas</span>
+          <b id="debugCanvas">—</b>
+        </div>
+
+
+        <div>
+          <span>Signal</span>
+          <b id="debugSignal">—</b>
+        </div>
+
+
+        <div>
+          <span>WebRTC</span>
+          <b id="debugRtc">—</b>
+        </div>
+
+
+        <div>
+          <span>Segmentation</span>
+          <b id="debugSeg">—</b>
+        </div>
+
+      </section>
+
+
+      <button
+        id="debugToggle"
+        class="debug-toggle"
+      >
+        SYSTEM
+      </button>
+
+
+      <div
+        id="toast"
+        class="toast"
+      ></div>
 
     </section>
 
+  </main>
 
-    <!-- =========================================================
-         RH WORLD
-    ========================================================== -->
 
-    <main
-        id="rhWorld"
-        class="rh-world hidden"
-    >
+  <!-- =========================================================
+       THREE.JS
+       ========================================================= -->
 
-        <!-- Three.js canvas -->
-        <canvas
-            id="rhCanvas"
-            class="rh-canvas"
-        ></canvas>
+  <script
+    src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js">
+  </script>
 
 
-        <!-- =====================================================
-             REAL HUMAN PRESENCE CANVASES
-        ====================================================== -->
+  <!-- =========================================================
+       MEDIAPIPE SELFIE SEGMENTATION
 
-        <div
-            id="localPresence"
-            class="presence-person local-person"
-        >
-            <canvas
-                id="localCanvas"
-                class="presence-canvas"
-            ></canvas>
+       Used to separate the real person from the camera
+       background.
 
-            <div class="person-label">
-                <span class="live-dot"></span>
-                You
-            </div>
-        </div>
+       The person remains real.
+       ========================================================= -->
 
+  <script
+    src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js">
+  </script>
 
-        <div
-            id="remotePresence"
-            class="presence-person remote-person hidden"
-        >
-            <canvas
-                id="remoteCanvas"
-                class="presence-canvas"
-            ></canvas>
 
-            <div class="person-label">
-                <span class="live-dot"></span>
-                Family
-            </div>
-        </div>
+  <!-- =========================================================
+       RH APPLICATION
+       ========================================================= -->
 
-
-        <!-- Hidden source video elements.
-             These are NOT displayed as video rectangles. -->
-
-        <video
-            id="localVideo"
-            autoplay
-            muted
-            playsinline
-        ></video>
-
-        <video
-            id="remoteVideo"
-            autoplay
-            playsinline
-        ></video>
-
-
-        <!-- =====================================================
-             TOP HEADER
-        ====================================================== -->
-
-        <header class="world-header">
-
-            <div class="world-brand">
-
-                <div class="world-logo">
-                    RH
-                </div>
-
-                <div>
-                    <div class="world-title">
-                        REAL HUMAN PRESENCE
-                    </div>
-
-                    <div
-                        id="placeName"
-                        class="world-place"
-                    >
-                        Quiet Park
-                    </div>
-                </div>
-
-            </div>
-
-
-            <div class="world-status">
-
-                <div class="connection-pill">
-
-                    <span
-                        id="connectionDot"
-                        class="status-dot waiting"
-                    ></span>
-
-                    <span id="connectionText">
-                        Connecting
-                    </span>
-
-                </div>
-
-
-                <div class="room-pill">
-
-                    ROOM
-
-                    <strong id="worldRoom">
-                        RH-DEMO
-                    </strong>
-
-                </div>
-
-            </div>
-
-        </header>
-
-
-        <!-- =====================================================
-             WAITING MESSAGE
-        ====================================================== -->
-
-        <div
-            id="waitingMessage"
-            class="waiting-message"
-        >
-
-            <div class="waiting-icon">
-                ◌
-            </div>
-
-            <div>
-                <strong>Waiting for your person</strong>
-
-                <span>
-                    Share the room name with someone you love.
-                </span>
-            </div>
-
-        </div>
-
-
-        <!-- =====================================================
-             BOTTOM CONTROLS
-        ====================================================== -->
-
-        <div class="world-controls">
-
-            <button
-                id="muteBtn"
-                class="control-btn"
-                type="button"
-                title="Mute microphone"
-            >
-                🎙️
-                <span>Mute</span>
-            </button>
-
-
-            <button
-                id="cameraBtn"
-                class="control-btn"
-                type="button"
-                title="Turn camera off"
-            >
-                📷
-                <span>Camera</span>
-            </button>
-
-
-            <button
-                id="walkBtn"
-                class="control-btn walk-control"
-                type="button"
-                title="Toggle walking"
-            >
-                🚶
-                <span>Walk</span>
-            </button>
-
-
-            <button
-                id="meetBtn"
-                class="control-btn"
-                type="button"
-                title="Meet"
-            >
-                🤝
-                <span>Meet</span>
-            </button>
-
-
-            <button
-                id="copyWorldRoomBtn"
-                class="control-btn"
-                type="button"
-                title="Copy room"
-            >
-                🔗
-                <span>Share</span>
-            </button>
-
-
-            <button
-                id="exitBtn"
-                class="control-btn exit-control"
-                type="button"
-                title="Exit RH"
-            >
-                ✕
-                <span>Exit</span>
-            </button>
-
-        </div>
-
-
-        <!-- =====================================================
-             WALKING HINT
-        ====================================================== -->
-
-        <div
-            id="movementHint"
-            class="movement-hint"
-        >
-            Click anywhere to walk · Use W A S D or arrow keys
-        </div>
-
-
-        <!-- =====================================================
-             DEBUG PANEL
-        ====================================================== -->
-
-        <aside
-            id="debugPanel"
-            class="debug-panel"
-        >
-
-            <div class="debug-title">
-                RH SYSTEM
-            </div>
-
-            <div class="debug-row">
-
-                <span>HTTPS</span>
-
-                <strong id="debugHttps">
-                    —
-                </strong>
-
-            </div>
-
-            <div class="debug-row">
-
-                <span>Camera</span>
-
-                <strong id="debugCamera">
-                    —
-                </strong>
-
-            </div>
-
-            <div class="debug-row">
-
-                <span>Signal</span>
-
-                <strong id="debugSignal">
-                    —
-                </strong>
-
-            </div>
-
-            <div class="debug-row">
-
-                <span>WebRTC</span>
-
-                <strong id="debugWebrtc">
-                    —
-                </strong>
-
-            </div>
-
-        </aside>
-
-
-        <!-- =====================================================
-             TOAST
-        ====================================================== -->
-
-        <div
-            id="rhToast"
-            class="rh-toast"
-        >
-            <span id="toastText"></span>
-        </div>
-
-    </main>
-
-
-    <!-- =========================================================
-         THREE.JS
-    ========================================================== -->
-
-    <script
-        src="https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.min.js"
-        crossorigin="anonymous"
-    ></script>
-
-
-    <!-- =========================================================
-         MEDIAPIPE SELFIE SEGMENTATION
-    ========================================================== -->
-
-    <script
-        src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"
-        crossorigin="anonymous"
-    ></script>
-
-
-    <!-- =========================================================
-         RH APPLICATION
-    ========================================================== -->
-
-    <script src="app.js"></script>
+  <script src="app.js"></script>
 
 </body>
 </html>
